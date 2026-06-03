@@ -16,7 +16,8 @@
   "bin": {
     "penca-mcp": "./dist/index.js"
   },
-  "files": ["dist", "README.md"],
+  "files": ["dist", "assets", "README.md"],
+  "publishConfig": { "access": "public" },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
@@ -25,7 +26,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.0",
-    "penca-ovacion-sdk": "workspace:*",
     "zod": "^3.23.8"
+  },
+  "optionalDependencies": {
+    "keytar": "^7.9.0"
+  },
+  "devDependencies": {
+    "penca-ovacion-sdk": "workspace:*"
   }
 }

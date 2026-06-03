@@ -50,12 +50,17 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.0
         version: 1.29.0(zod@3.25.76)
-      penca-ovacion-sdk:
-        specifier: workspace:*
-        version: link:../sdk
       zod:
         specifier: ^3.23.8
         version: 3.25.76
+    optionalDependencies:
+      keytar:
+        specifier: ^7.9.0
+        version: 7.9.0
+    devDependencies:
+      penca-ovacion-sdk:
+        specifier: workspace:*
+        version: link:../sdk
 
   packages/sdk:
     optionalDependencies:
