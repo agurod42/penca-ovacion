@@ -14,7 +14,7 @@
     "packages/mcp"
   ],
   "scripts": {
-    "build": "npm run build -w penca-ovacion-sdk && npm run build -w penca-ovacion && npm run build -w penca-ovacion-mcp",
+    "build": "npm run build -w penca-ovacion-sdk && npm run build -w penca-ovacion && npm run build -w @1930dev/penca-ovacion-mcp",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",

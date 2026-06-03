@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { Buffer } from 'node:buffer';
+import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { PencaClient } from 'penca-ovacion-sdk';
 import { z } from 'zod';
