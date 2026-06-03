@@ -1,14 +1,14 @@
 {
   "name": "penca-ovacion-sdk",
   "version": "0.1.0",
-  "description": "Typed TypeScript SDK for the Penca Antel Ovación API (unofficial).",
+  "description": "SDK tipado en TypeScript para la API de Penca Antel Ovación (no oficial).",
   "type": "module",
   "license": "MIT",
   "author": "Agustín Rodríguez",
-  "homepage": "https://github.com/aguro/penca-ovacion-cli#readme",
+  "homepage": "https://github.com/agurod42/penca-ovacion#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aguro/penca-ovacion-cli.git",
+    "url": "https://github.com/agurod42/penca-ovacion.git",
     "directory": "packages/sdk"
   },
   "keywords": ["penca", "ovacion", "futbol", "mundial", "sdk", "uruguay"],

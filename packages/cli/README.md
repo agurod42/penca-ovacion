@@ -1,6 +1,6 @@
 # penca-ovacion (`penca`)
 
-Command-line client for **Penca Antel Ovación** (unofficial).
+Cliente de línea de comandos para **Penca Antel Ovación** (no oficial).
 
 ```bash
 npm install -g penca-ovacion
@@ -9,13 +9,14 @@ penca matches <tournamentId> --view upcoming
 penca predict <matchId> 2 1
 ```
 
-Run `penca --help` for the full command list. Every command supports `--json` for
-machine-readable output, plus `--no-color`, `--base-url`, and `--debug`.
+Corré `penca --help` para ver la lista completa de comandos. Todos soportan `--json` para
+salida procesable por máquina, además de `--no-color`, `--base-url` y `--debug`.
 
-Tokens are stored in your OS keychain (file fallback). Set `PENCA_TOKEN` to use a token
-from the environment instead.
+El ingreso es sin contraseña por defecto (magic link por email). Los tokens se guardan en el
+llavero del sistema (con respaldo a archivo). Definí `PENCA_TOKEN` para usar un token desde
+el entorno.
 
-See the [repository README](https://github.com/aguro/penca-ovacion-cli#readme) for
-everything else. **Unofficial** — not affiliated with Ovación/Antel/FutbolX.
+Mirá el [README del repositorio](https://github.com/agurod42/penca-ovacion#readme) para todo
+lo demás. **No oficial** — sin afiliación con Ovación/Antel/FutbolX.
 
 MIT © Agustín Rodríguez

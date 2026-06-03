@@ -1,40 +1,42 @@
-# LLM skills
+# Skills para LLMs
 
-Vendor-specific wrappers that let LLM agents drive the penca. They all sit on top of the
-same `penca-ovacion-sdk` (directly, via the `penca` CLI, or via the MCP server), so no
-agent integration re-implements the API.
+Wrappers específicos por proveedor que le permiten a los agentes LLM manejar la penca. Todos
+se apoyan en el mismo `penca-ovacion-sdk` (directamente, vía la CLI `penca`, o vía el
+servidor MCP), así que ninguna integración reimplementa la API.
 
-## What's here
+## Qué hay acá
 
-- [`claude/penca`](claude/penca/SKILL.md) — an Anthropic
-  [Agent Skill](https://docs.claude.com). It instructs Claude to drive `penca … --json`.
-  Install by copying the `penca/` folder into your skills directory (e.g.
+- [`claude/penca`](claude/penca/SKILL.md) — un
+  [Agent Skill](https://docs.claude.com) de Anthropic. Le indica a Claude que maneje
+  `penca … --json`. Instalalo copiando la carpeta `penca/` a tu directorio de skills (ej.
   `~/.claude/skills/`).
 
-## The universal path: MCP
+## El camino universal: MCP
 
-For most LLM integrations, prefer the **MCP server** (`penca-ovacion-mcp`) over a
-bespoke wrapper — it already exposes every capability as typed tools and works with any
-MCP-compatible client (Claude Desktop, Claude Code, and a growing list of others). See
-[`packages/mcp`](../packages/mcp).
+Para la mayoría de las integraciones con LLMs, preferí el **servidor MCP**
+(`penca-ovacion-mcp`) por sobre un wrapper a medida — ya expone cada capacidad como
+herramientas tipadas y funciona con cualquier cliente compatible con MCP (Claude Desktop,
+Claude Code y una lista creciente de otros). Mirá [`packages/mcp`](../packages/mcp).
 
-## Adding a wrapper for another LLM
+## Agregar un wrapper para otro LLM
 
-Pick the integration surface that fits the platform, then describe the same capabilities:
+Elegí la superficie de integración que le sirva a la plataforma y después describí las
+mismas capacidades:
 
-1. **Tool/function-calling specs (e.g. OpenAI):** generate a JSON Schema per capability
-   that shells out to `penca <command> --json`, or call `penca-ovacion-sdk` from a small
-   server. Keep one function per SDK method (`tournaments`, `matches`, `predict`,
-   `groups`, `ranking`, `wall`, `polls`, `digest`, `predictions`).
-2. **Prompt/skill files:** mirror [`claude/penca/SKILL.md`](claude/penca/SKILL.md) — list
-   the `--json` commands and the same safety guidance (confirm writes, never handle the
-   user's password, don't bulk-scrape).
+1. **Specs de tools/function-calling (ej. OpenAI):** generá un JSON Schema por capacidad que
+   llame a `penca <comando> --json`, o llamá a `penca-ovacion-sdk` desde un servidor chico.
+   Mantené una función por método del SDK (`tournaments`, `matches`, `predict`, `groups`,
+   `ranking`, `wall`, `polls`, `digest`, `predictions`).
+2. **Archivos de prompt/skill:** reflejá [`claude/penca/SKILL.md`](claude/penca/SKILL.md) —
+   listá los comandos `--json` y las mismas pautas de seguridad (confirmar las escrituras,
+   nunca manejar la contraseña del usuario, no scrapear en masa).
 
-Conventions for any new wrapper:
+Convenciones para cualquier wrapper nuevo:
 
-- Read-only by default; require explicit user confirmation before `predict` / `wall post`
-  / `group join|leave`.
-- Always request `--json` (or call the SDK) for structured output.
-- Never ask the user for their password — authentication is `penca login` or `PENCA_TOKEN`.
+- Solo lectura por defecto; pedí confirmación explícita del usuario antes de `predict` /
+  `wall post` / `group join|leave`.
+- Pedí siempre `--json` (o llamá al SDK) para salida estructurada.
+- Nunca le pidas la contraseña al usuario — la autenticación es `penca login` o
+  `PENCA_TOKEN`.
 
-Open a PR adding your wrapper under `skills/<vendor>/`.
+Abrí un PR agregando tu wrapper en `skills/<proveedor>/`.

@@ -1,14 +1,14 @@
 {
   "name": "penca-ovacion",
   "version": "0.1.0",
-  "description": "Command-line client for Penca Antel Ovación (unofficial).",
+  "description": "Cliente de línea de comandos para Penca Antel Ovación (no oficial).",
   "type": "module",
   "license": "MIT",
   "author": "Agustín Rodríguez",
-  "homepage": "https://github.com/aguro/penca-ovacion-cli#readme",
+  "homepage": "https://github.com/agurod42/penca-ovacion#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aguro/penca-ovacion-cli.git",
+    "url": "https://github.com/agurod42/penca-ovacion.git",
     "directory": "packages/cli"
   },
   "keywords": ["penca", "ovacion", "cli", "futbol", "mundial", "uruguay"],

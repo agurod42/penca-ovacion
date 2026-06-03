@@ -2,7 +2,7 @@
   "name": "penca-ovacion-monorepo",
   "version": "0.1.0",
   "private": true,
-  "description": "Unofficial toolkit for Penca Antel Ovación — typed SDK, CLI, and MCP server.",
+  "description": "Toolkit no oficial para Penca Antel Ovación — SDK tipado, CLI y servidor MCP.",
   "type": "module",
   "license": "MIT",
   "engines": {

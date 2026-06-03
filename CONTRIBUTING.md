@@ -1,8 +1,8 @@
-# Contributing
+# Contribuir
 
-Thanks for helping improve the Penca Ovación toolkit!
+¡Gracias por ayudar a mejorar el toolkit de Penca Ovación!
 
-## Setup
+## Preparación
 
 ```bash
 pnpm install
@@ -10,31 +10,31 @@ pnpm build
 pnpm test
 ```
 
-## Project layout
+## Estructura del proyecto
 
-- `packages/sdk` — the typed API client. **Every new endpoint starts here.** Add the
-  method to the relevant resource (or a new one), add types in `src/types.ts`, and add a
-  unit test driven by the mocked fetch in `test/`.
-- `packages/cli` — thin command layer over the SDK. Keep formatting in `src/output.ts`;
-  every command must support `--json`.
-- `packages/mcp` — register a tool in `src/server.ts` mirroring the SDK method.
-- `skills/` — LLM-specific wrappers over the CLI/MCP.
+- `packages/sdk` — el cliente tipado de la API. **Todo endpoint nuevo empieza acá.** Agregá
+  el método al resource que corresponda (o uno nuevo), agregá los tipos en `src/types.ts` y
+  agregá un test unitario con el fetch mockeado en `test/`.
+- `packages/cli` — capa fina de comandos sobre el SDK. Dejá el formateo en `src/output.ts`;
+  todo comando debe soportar `--json`.
+- `packages/mcp` — registrá una herramienta en `src/server.ts` que refleje el método del SDK.
+- `skills/` — wrappers específicos por LLM sobre la CLI/MCP.
 
-## Ground rules
+## Reglas básicas
 
-- **Never commit credentials, tokens, or raw network captures** (`*.mitm`, `*.har` are
-  git-ignored). Test fixtures must use **synthetic** data only — no real users' personal
-  information, no real emails/IDs.
-- Run `pnpm lint` and `pnpm test` before opening a PR; CI runs typecheck + lint + test +
+- **Nunca commitees credenciales, tokens ni capturas de red crudas** (`*.mitm`, `*.har`
+  están en el `.gitignore`). Los fixtures de tests deben usar datos **sintéticos** —
+  nada de información personal de usuarios reales, ni emails/IDs reales.
+- Corré `pnpm lint` y `pnpm test` antes de abrir un PR; CI corre typecheck + lint + test +
   build.
-- Match the existing code style (Biome enforces formatting).
-- Be a good API citizen: don't add anything that hammers the API or scrapes other users'
-  data en masse.
+- Respetá el estilo de código existente (Biome impone el formato).
+- Sé buen ciudadano de la API: no agregues nada que le pegue sin control ni que scrapee
+  datos de otros usuarios en masa.
 
-## Adding a new endpoint
+## Agregar un endpoint nuevo
 
-1. Capture/confirm the request and response shape.
-2. SDK: add the resource method + types + a test.
-3. CLI: add a command (human view + `--json`).
-4. MCP: add a tool.
-5. Update the README endpoint list if relevant.
+1. Capturá/confirmá la forma del request y la respuesta.
+2. SDK: agregá el método del resource + tipos + un test.
+3. CLI: agregá un comando (vista para humanos + `--json`).
+4. MCP: agregá una herramienta.
+5. Actualizá la lista de endpoints del README si corresponde.

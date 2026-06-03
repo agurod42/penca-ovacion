@@ -1,113 +1,113 @@
 # Penca Ovación toolkit
 
-Unofficial, community-built toolkit for **Penca Antel Ovación** — Uruguay's massively
-popular football-prediction game. Use the penca from your terminal, your scripts, or an
-LLM agent: a typed **SDK**, a polished **CLI**, and an **MCP server**.
+Toolkit no oficial, hecho por la comunidad, para **Penca Antel Ovación** — el juego de
+pronósticos de fútbol más popular de Uruguay. Usá la penca desde la terminal, desde tus
+scripts o desde un agente LLM: un **SDK** tipado, una **CLI** prolija y un **servidor MCP**.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  penca-ovacion-sdk   typed API client · auth · token storage  │
+│  penca-ovacion-sdk   cliente tipado · auth · guardado de tokens │
 └───────┬─────────────────────────┬──────────────────────┬─────┘
         │                         │                      │
    penca-ovacion            penca-ovacion-mcp        skills/claude
-   (CLI · `penca`)          (MCP · `penca-mcp`)      (Anthropic skill)
+   (CLI · `penca`)          (MCP · `penca-mcp`)      (skill de Claude)
 ```
 
 > [!WARNING]
-> **Unofficial.** This project is not affiliated with, endorsed by, or supported by
-> Ovación, Antel, or FutbolX. It talks to the same private API the mobile app uses,
-> reverse-engineered for interoperability. Use it responsibly and at your own risk,
-> respect the service's Terms of Service, and don't hammer the API. Your credentials
-> and tokens never leave your machine — they go only to the official API and are stored
-> locally in your OS keychain.
+> **No oficial.** Este proyecto no está afiliado ni respaldado por Ovación, Antel ni
+> FutbolX. Habla con la misma API privada que usa la app móvil, hecha ingeniería inversa
+> para interoperar. Usalo con responsabilidad y bajo tu propio riesgo, respetá los
+> Términos del servicio y no le pegues a la API sin control. Tus credenciales y tokens
+> nunca salen de tu máquina — van únicamente a la API oficial y se guardan localmente en
+> el llavero (keychain) de tu sistema.
 
-## Quick start
+## Arranque rápido
 
-Requires **Node ≥ 20**.
+Requiere **Node ≥ 20**.
 
 ```bash
-# from a checkout (until published to npm)
+# desde un clon (hasta que se publique en npm)
 pnpm install
 pnpm build
 node packages/cli/dist/index.js --help
 
-# or link the CLI globally
+# o enlazá la CLI globalmente
 pnpm --filter penca-ovacion exec npm link
 penca --help
 ```
 
-### Log in and play
+### Entrá y jugá
 
 ```bash
-penca login                       # passwordless: emails you a magic link, paste it back
+penca login                       # sin contraseña: te manda un magic link, lo pegás de vuelta
 penca whoami
 penca profile --nickname "bielsista"
 penca tournaments
 penca matches <tournamentId> --view upcoming
-penca ovi <matchId>               # Ovi's AI prediction + reasoning
-penca predict <matchId> 2 1       # predict a 2-1
-penca groups                      # your groups
+penca ovi <matchId>               # el pronóstico con IA de Ovi + su razonamiento
+penca predict <matchId> 2 1       # pronosticá un 2-1
+penca groups                      # tus grupos
 penca ranking <groupId>
 penca wall --group <groupId>
 penca wall post "¡Vamos Uruguay!" --group <groupId>
 penca polls
-penca digest                      # Ovi's daily digest
+penca digest                      # el resumen diario de Ovi
 ```
 
-Every command accepts `--json` for machine-readable output (ideal for scripts and
-agents), plus `--no-color`, `--base-url <url>`, and `--debug`.
+Todos los comandos aceptan `--json` para salida procesable por máquina (ideal para scripts
+y agentes), además de `--no-color`, `--base-url <url>` y `--debug`.
 
-### Authentication & token storage
+### Autenticación y guardado de tokens
 
-The primary email sign-in is **passwordless**: `penca login` emails you a magic link;
-you paste the link (or its token) back into the prompt to complete sign-in. For
-automation, split it across two steps:
+El ingreso principal por email es **sin contraseña**: `penca login` te manda un magic link
+por correo; pegás el link (o su token) en el prompt para completar el ingreso. Para
+automatizar, partilo en dos pasos:
 
 ```bash
-penca login --email you@example.com          # sends the link (prints next step)
-penca login --token "<link-or-token>"        # completes sign-in
+penca login --email vos@example.com          # manda el link (te dice el próximo paso)
+penca login --token "<link-o-token>"         # completa el ingreso
 ```
 
-Email + password (`penca login --password`) and social providers
-(`client.loginWithProvider({ provider, token })` in the SDK) are also supported.
+También se soporta email + contraseña (`penca login --password`) y proveedores sociales
+(`client.loginWithProvider({ provider, token })` en el SDK).
 
-The resulting JWTs (access + refresh) are stored in your **OS keychain** (via `keytar`),
-falling back to a `0600` file at `~/.config/penca/tokens.json` when no keychain is
-available (Linux/CI). Expired access tokens are refreshed automatically via
+Los JWT resultantes (access + refresh) se guardan en el **llavero del sistema** (vía
+`keytar`), con respaldo a un archivo `0600` en `~/.config/penca/tokens.json` cuando no hay
+llavero disponible (Linux/CI). Los access tokens vencidos se renuevan automáticamente vía
 `POST /auth/refresh`.
 
-For CI or stateless use, set `PENCA_TOKEN` (and optionally `PENCA_REFRESH_TOKEN`) and
-both the CLI and MCP server will use it instead of the stored session.
+Para CI o uso sin estado, definí `PENCA_TOKEN` (y opcionalmente `PENCA_REFRESH_TOKEN`) y
+tanto la CLI como el servidor MCP lo usan en lugar de la sesión guardada.
 
-## Packages
+## Paquetes
 
-| Package | Name | What it is |
+| Paquete | Nombre | Qué es |
 | --- | --- | --- |
-| [`packages/sdk`](packages/sdk) | `penca-ovacion-sdk` | Typed TypeScript client for the API. Zero CLI dependencies — the foundation everything else builds on. |
-| [`packages/cli`](packages/cli) | `penca-ovacion` (`penca`) | The command-line client. |
-| [`packages/mcp`](packages/mcp) | `penca-ovacion-mcp` (`penca-mcp`) | A [Model Context Protocol](https://modelcontextprotocol.io) server exposing the penca as tools to Claude and any MCP client. |
-| [`skills/claude`](skills) | — | An Anthropic [Agent Skill](https://docs.claude.com) wrapping the CLI. |
+| [`packages/sdk`](packages/sdk) | `penca-ovacion-sdk` | Cliente tipado en TypeScript para la API. Sin dependencias de CLI — la base sobre la que se construye todo lo demás. |
+| [`packages/cli`](packages/cli) | `penca-ovacion` (`penca`) | El cliente de línea de comandos. |
+| [`packages/mcp`](packages/mcp) | `penca-ovacion-mcp` (`penca-mcp`) | Un servidor [Model Context Protocol](https://modelcontextprotocol.io) que expone la penca como herramientas para Claude y cualquier cliente MCP. |
+| [`skills/claude`](skills) | — | Un [Agent Skill](https://docs.claude.com) de Anthropic que envuelve la CLI. |
 
-## Using the SDK
+## Usando el SDK
 
 ```ts
 import { PencaClient } from 'penca-ovacion-sdk';
 
-const penca = new PencaClient(); // uses keychain session by default
-await penca.login({ email: 'you@example.com', password: '••••••' });
+const penca = new PencaClient(); // usa la sesión del llavero por defecto
+await penca.login({ email: 'vos@example.com', password: '••••••' });
 
 const tournaments = await penca.tournaments.list();
 const { data: matches } = await penca.tournaments.matches(tournaments[0].id, { view: 'upcoming' });
 await penca.matches.predict(matches[0].id, { homeScore: 2, awayScore: 1 });
 
-// async pagination helper
+// helper de paginación asíncrona
 import { paginate, collect } from 'penca-ovacion-sdk';
 const allPosts = await collect(paginate((page) => penca.wall.posts({ page, limit: 20 }), { limit: 20 }));
 ```
 
-## Using the MCP server (Claude)
+## Usando el servidor MCP (Claude)
 
-The MCP server reuses the session created by `penca login` (or `PENCA_TOKEN`). Add it to
+El servidor MCP reutiliza la sesión creada por `penca login` (o `PENCA_TOKEN`). Agregalo a
 Claude Desktop / Claude Code:
 
 ```json
@@ -120,41 +120,43 @@ Claude Desktop / Claude Code:
 }
 ```
 
-Tools: `penca_whoami`, `penca_update_profile`, `penca_tournaments`, `penca_matches`, `penca_match_statistics`,
-`penca_ovi_prediction`, `penca_predict`, `penca_digest`, `penca_groups_mine`,
-`penca_groups_public`, `penca_ranking`, `penca_wall_read`, `penca_wall_post`,
-`penca_polls`, `penca_articles`, `penca_predictions`.
+Herramientas: `penca_whoami`, `penca_update_profile`, `penca_tournaments`, `penca_matches`,
+`penca_match_statistics`, `penca_ovi_prediction`, `penca_predict`, `penca_digest`,
+`penca_groups_mine`, `penca_groups_public`, `penca_ranking`, `penca_wall_read`,
+`penca_wall_post`, `penca_polls`, `penca_articles`, `penca_predictions`.
 
-## Development
+## Desarrollo
 
 ```bash
-pnpm install      # install workspace deps (allows native keytar/esbuild builds)
-pnpm build        # build sdk → cli → mcp
-pnpm test         # vitest across all packages
-pnpm typecheck    # tsc --noEmit per package
+pnpm install      # instala deps del workspace (permite builds nativos de keytar/esbuild)
+pnpm build        # compila sdk → cli → mcp
+pnpm test         # vitest en todos los paquetes
+pnpm typecheck    # tsc --noEmit por paquete
 pnpm lint         # biome
 ```
 
-The repo is a [pnpm](https://pnpm.io) workspace. `npm`/`yarn` also work but pnpm is
-recommended. Package names are unscoped so the packages can be published without an npm
-org; switch to a scope (e.g. `@you/penca-ovacion-*`) in each `package.json` if you prefer.
+El repo es un workspace de [pnpm](https://pnpm.io). `npm`/`yarn` también funcionan, pero se
+recomienda pnpm. Los nombres de los paquetes no tienen scope, así que se pueden publicar sin
+una organización de npm; cambialos a un scope (ej. `@vos/penca-ovacion-*`) en cada
+`package.json` si lo preferís.
 
-## Extending to other LLMs
+## Extender a otros LLMs
 
-The **MCP server is the universal LLM integration** — it works with Claude, and any
-MCP-compatible client. The `skills/` directory holds vendor-specific wrappers (currently
-an Anthropic skill); see [`skills/README.md`](skills/README.md) for how to add an OpenAI
-function-spec wrapper or others. All of them build on `penca-ovacion-sdk`, so new surfaces
-never re-implement the API.
+El **servidor MCP es la integración universal con LLMs** — funciona con Claude y con
+cualquier cliente compatible con MCP. El directorio `skills/` contiene los wrappers
+específicos por proveedor (por ahora un skill de Anthropic); mirá
+[`skills/README.md`](skills/README.md) para ver cómo agregar un wrapper con function-specs
+de OpenAI u otros. Todos se apoyan en `penca-ovacion-sdk`, así que ninguna integración
+reimplementa la API.
 
-## Status & roadmap
+## Estado y hoja de ruta
 
-Implemented: full read surface, predictions, group join/leave, wall posting, profile
-editing, and full auth (passwordless magic link, email+password, social providers, refresh,
-logout) — all verified live. Not yet modeled (endpoints weren't observed): poll voting,
-follow/unfollow, post likes/comments — reachable today via the SDK's generic
-`client.request()` escape hatch.
+Implementado: superficie de lectura completa, pronósticos, unirse/salir de grupos, publicar
+en el muro, editar perfil y auth completa (magic link sin contraseña, email + contraseña,
+proveedores sociales, refresh, logout) — todo verificado en vivo. Todavía no modelado (no se
+observaron los endpoints): votar en encuestas, seguir/dejar de seguir, likes/comentarios en
+posts — accesibles hoy vía el escape hatch genérico `client.request()` del SDK.
 
-## License
+## Licencia
 
 [MIT](LICENSE) © Agustín Rodríguez

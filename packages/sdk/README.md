@@ -1,6 +1,6 @@
 # penca-ovacion-sdk
 
-Typed TypeScript SDK for the **Penca Antel Ovación** API (unofficial).
+SDK tipado en TypeScript para la API de **Penca Antel Ovación** (no oficial).
 
 ```bash
 npm install penca-ovacion-sdk
@@ -10,24 +10,25 @@ npm install penca-ovacion-sdk
 import { PencaClient } from 'penca-ovacion-sdk';
 
 const penca = new PencaClient();
-await penca.login({ email: 'you@example.com', password: '••••••' });
+await penca.login({ email: 'vos@example.com', password: '••••••' });
 
 const tournaments = await penca.tournaments.list();
 const { data } = await penca.tournaments.matches(tournaments[0].id, { view: 'upcoming' });
 await penca.matches.predict(data[0].id, { homeScore: 2, awayScore: 1 });
 ```
 
-## Highlights
+## Destacados
 
-- Full typed surface: `tournaments`, `matches`, `groups`, `wall`, `polls`, `articles`,
-  `users`, `home`.
-- Auth with automatic refresh on 401.
-- Pluggable token storage: `KeychainTokenStore` (default), `FileTokenStore`,
+- Superficie tipada completa: `tournaments`, `matches`, `groups`, `wall`, `polls`,
+  `articles`, `users`, `home`.
+- Auth con renovación automática ante un 401 (magic link sin contraseña, email +
+  contraseña, proveedores sociales).
+- Guardado de tokens enchufable: `KeychainTokenStore` (por defecto), `FileTokenStore`,
   `EnvTokenStore`, `MemoryTokenStore`.
-- `paginate()` / `collect()` async-iterator helpers.
-- `client.request()` escape hatch for endpoints not yet modeled.
+- Helpers de paginación con async iterator: `paginate()` / `collect()`.
+- Escape hatch `client.request()` para endpoints todavía no modelados.
 
-See the [repository README](https://github.com/aguro/penca-ovacion-cli#readme) for the
-full picture (CLI + MCP). **Unofficial** — not affiliated with Ovación/Antel/FutbolX.
+Mirá el [README del repositorio](https://github.com/agurod42/penca-ovacion#readme) para la
+foto completa (CLI + MCP). **No oficial** — sin afiliación con Ovación/Antel/FutbolX.
 
 MIT © Agustín Rodríguez
