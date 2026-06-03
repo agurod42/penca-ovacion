@@ -1,10 +1,10 @@
-# penca-ovacion-mcp (`penca-mcp`)
+# @1930dev/penca-ovacion-mcp (`penca-mcp`)
 
 Un servidor [Model Context Protocol](https://modelcontextprotocol.io) para **Penca Antel
 Ovación** (no oficial). Usá la penca desde Claude, Cursor, Codex o cualquier cliente MCP:
 pronósticos, partidos, grupos, ranking, muro y más.
 
-[![npm](https://img.shields.io/npm/v/penca-ovacion-mcp?color=cb0000&logo=npm)](https://www.npmjs.com/package/penca-ovacion-mcp)
+[![npm](https://img.shields.io/npm/v/@1930dev/penca-ovacion-mcp?color=cb0000&logo=npm)](https://www.npmjs.com/package/@1930dev/penca-ovacion-mcp)
 [![Add to Cursor](https://img.shields.io/badge/Add%20to-Cursor-000000?logo=cursor&logoColor=white)](cursor://anysphere.cursor-deeplink/mcp/install?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovL3BlbmNhLW92YWNpb24uMTkzMC5kZXYvbWNwIn0=)
 [![Add to VS Code](https://img.shields.io/badge/Add%20to-VS%20Code-007ACC?logo=visualstudiocode&logoColor=white)](vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//penca-ovacion.1930.dev/mcp%22%7D)
 
@@ -46,19 +46,19 @@ Requiere **Node ≥ 20**.
 **Claude Desktop** (`claude_desktop_config.json`) o cualquier cliente con `mcpServers`:
 
 ```json
-{ "mcpServers": { "penca": { "command": "npx", "args": ["-y", "penca-ovacion-mcp"] } } }
+{ "mcpServers": { "penca": { "command": "npx", "args": ["-y", "@1930dev/penca-ovacion-mcp"] } } }
 ```
 
 **Claude Code:**
 
 ```bash
-claude mcp add penca -- npx -y penca-ovacion-mcp
+claude mcp add penca -- npx -y @1930dev/penca-ovacion-mcp
 ```
 
 **Cursor (stdio):**
-[![Add to Cursor (npx)](https://img.shields.io/badge/Add%20to-Cursor%20(npx)-000000?logo=cursor&logoColor=white)](cursor://anysphere.cursor-deeplink/mcp/install?name=penca-ovacion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInBlbmNhLW92YWNpb24tbWNwIl19)
+[![Add to Cursor (npx)](https://img.shields.io/badge/Add%20to-Cursor%20(npx)-000000?logo=cursor&logoColor=white)](cursor://anysphere.cursor-deeplink/mcp/install?name=penca-ovacion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkAxOTMwZGV2L3BlbmNhLW92YWNpb24tbWNwIl19)
 &nbsp;**VS Code (stdio):**
-[![Add to VS Code (npx)](https://img.shields.io/badge/Add%20to-VS%20Code%20(npx)-007ACC?logo=visualstudiocode&logoColor=white)](vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22penca-ovacion-mcp%22%5D%7D)
+[![Add to VS Code (npx)](https://img.shields.io/badge/Add%20to-VS%20Code%20(npx)-007ACC?logo=visualstudiocode&logoColor=white)](vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%401930dev/penca-ovacion-mcp%22%5D%7D)
 
 ## Autenticación
 

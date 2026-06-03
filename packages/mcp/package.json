@@ -1,5 +1,5 @@
 {
-  "name": "penca-ovacion-mcp",
+  "name": "@1930dev/penca-ovacion-mcp",
   "version": "0.1.0",
   "description": "Servidor Model Context Protocol para Penca Antel Ovación (no oficial).",
   "type": "module",

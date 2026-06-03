@@ -30,9 +30,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build sdk + mcp
-        run: pnpm --filter penca-ovacion-sdk build && pnpm --filter penca-ovacion-mcp build
+        run: pnpm --filter penca-ovacion-sdk build && pnpm --filter "@1930dev/penca-ovacion-mcp" build
 
       - name: Publish to npm
-        run: pnpm --filter penca-ovacion-mcp publish --no-git-checks --access public
+        run: pnpm --filter "@1930dev/penca-ovacion-mcp" publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
