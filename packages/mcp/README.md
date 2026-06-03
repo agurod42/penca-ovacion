@@ -5,8 +5,8 @@ Ovación** (no oficial). Usá la penca desde Claude, Cursor, Codex o cualquier c
 pronósticos, partidos, grupos, ranking, muro y más.
 
 [![npm](https://img.shields.io/npm/v/@1930dev/penca-ovacion-mcp?color=cb0000&logo=npm)](https://www.npmjs.com/package/@1930dev/penca-ovacion-mcp)
-[![Add to Cursor](https://img.shields.io/badge/Add%20to-Cursor-000000?logo=cursor&logoColor=white)](cursor://anysphere.cursor-deeplink/mcp/install?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovL3BlbmNhLW92YWNpb24uMTkzMC5kZXYvbWNwIn0=)
-[![Add to VS Code](https://img.shields.io/badge/Add%20to-VS%20Code-007ACC?logo=visualstudiocode&logoColor=white)](vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//penca-ovacion.1930.dev/mcp%22%7D)
+[![Add to Cursor](https://img.shields.io/badge/Add%20to-Cursor-000000?logo=cursor&logoColor=white)](cursor://anysphere.cursor-deeplink/mcp/install?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovLzE5MzAuZGV2L3BlbmNhLW92YWNpb24vbWNwIn0=)
+[![Add to VS Code](https://img.shields.io/badge/Add%20to-VS%20Code-007ACC?logo=visualstudiocode&logoColor=white)](vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//1930.dev/penca-ovacion/mcp%22%7D)
 
 ---
 
@@ -16,26 +16,26 @@ Hay dos formas. La **hosted no requiere instalar nada** y es la recomendada.
 
 ### Opción 1 — Hosted (recomendada, cero instalación)
 
-El servidor ya está corriendo en `https://penca-ovacion.1930.dev/mcp` (Streamable HTTP).
+El servidor ya está corriendo en `https://1930.dev/penca-ovacion/mcp` (Streamable HTTP).
 No necesitás Node ni npm: solo agregás la URL como conector remoto.
 
 **Claude (app web / desktop):** Settings → Connectors → *Add custom connector* → pegá la URL:
 
 ```
-https://penca-ovacion.1930.dev/mcp
+https://1930.dev/penca-ovacion/mcp
 ```
 
 **Claude Code:**
 
 ```bash
-claude mcp add --transport http penca-ovacion https://penca-ovacion.1930.dev/mcp
+claude mcp add --transport http penca-ovacion https://1930.dev/penca-ovacion/mcp
 ```
 
 **Cursor / VS Code:** usá los botones de arriba (o pegá el deeplink). Cursor también acepta
 en `mcp.json`:
 
 ```json
-{ "mcpServers": { "penca-ovacion": { "url": "https://penca-ovacion.1930.dev/mcp" } } }
+{ "mcpServers": { "penca-ovacion": { "url": "https://1930.dev/penca-ovacion/mcp" } } }
 ```
 
 ### Opción 2 — Local vía `npx` (stdio)
