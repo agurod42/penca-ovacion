@@ -1,7 +1,7 @@
 # Penca Ovación toolkit
 
-Toolkit no oficial, hecho por la comunidad, para **Penca Antel Ovación** — el juego de
-pronósticos de fútbol más popular de Uruguay. Usá la penca desde la terminal, desde tus
+Toolkit no oficial para **Penca Antel Ovación** — el juego de pronósticos de fútbol más
+popular de Uruguay. Usá la penca desde la terminal, desde tus
 scripts o desde un agente LLM: un **SDK** tipado, una **CLI** prolija y un **servidor MCP**.
 
 ```
