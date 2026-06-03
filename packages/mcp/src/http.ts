@@ -24,7 +24,9 @@ import { createServer } from './server.js';
  * Env:
  *   PORT                listen port (default 3000)
  *   MCP_PATH            request path for MCP (default /mcp)
- *   MCP_BEARER_SECRET   if set, requests must send `Authorization: Bearer <secret>`
+ *   MCP_BEARER_SECRET   if set, requests must present the secret either as
+ *                       `Authorization: Bearer <secret>` or as a `?token=<secret>`
+ *                       query param (for connector UIs that only accept a URL).
  *   PENCA_BASE_URL      (optional) override the Penca API base URL
  *
  * `GET /health` (unauthenticated) returns 200 for health checks.
@@ -51,12 +53,14 @@ function sendJson(res: ServerResponse, status: number, obj: unknown): void {
   res.end(JSON.stringify(obj));
 }
 
-function bearerOk(header: string | undefined): boolean {
+function authOk(header: string | undefined, queryToken: string | null): boolean {
   if (!BEARER) return true; // no guard configured
-  if (!header) return false;
-  const m = /^Bearer\s+(.+)$/i.exec(header);
-  if (!m) return false;
-  const provided = Buffer.from(m[1]);
+  let token: string | undefined;
+  const m = /^Bearer\s+(.+)$/i.exec(header ?? '');
+  if (m) token = m[1];
+  else if (queryToken) token = queryToken;
+  if (!token) return false;
+  const provided = Buffer.from(token);
   const expected = Buffer.from(BEARER);
   return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
@@ -159,7 +163,7 @@ const httpServer = createHttpServer(async (req, res) => {
     if (url.pathname !== MCP_PATH) {
       return sendJson(res, 404, { error: 'not found' });
     }
-    if (!bearerOk(req.headers.authorization)) {
+    if (!authOk(req.headers.authorization, url.searchParams.get('token'))) {
       return sendJson(res, 401, { error: 'unauthorized' });
     }
 
