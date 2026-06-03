@@ -1,0 +1,30 @@
+{
+  "name": "penca-ovacion-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for Penca Antel Ovación (unofficial).",
+  "type": "module",
+  "license": "MIT",
+  "author": "Agustín Rodríguez",
+  "homepage": "https://github.com/aguro/penca-ovacion-cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aguro/penca-ovacion-cli.git",
+    "directory": "packages/mcp"
+  },
+  "keywords": ["penca", "ovacion", "mcp", "model-context-protocol", "llm", "claude"],
+  "engines": { "node": ">=20" },
+  "bin": {
+    "penca-mcp": "./dist/index.js"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "penca-ovacion-sdk": "workspace:*",
+    "zod": "^3.23.8"
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.claude/settings.local.json
+*.tsbuildinfo
+*.log
+.DS_Store
+.env
+.env.*
+coverage/
+
+# Never commit raw captures or credentials
+*.mitm
+*.har
+secrets.json
