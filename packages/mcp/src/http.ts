@@ -1,6 +1,7 @@
 import { createServer as createHttpServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Buffer } from 'node:buffer';
+import { readFileSync } from 'node:fs';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
@@ -35,6 +36,17 @@ import { createServer } from './server.js';
 const PORT = Number(process.env.PORT ?? 3000);
 const MCP_PATH = process.env.MCP_PATH ?? '/mcp';
 const BEARER = process.env.MCP_BEARER_SECRET;
+
+/** Server icon, served (unauthenticated) at /icon.svg, /icon.png, /favicon.ico. */
+function loadAsset(rel: string): Buffer | undefined {
+  try {
+    return readFileSync(new URL(rel, import.meta.url));
+  } catch {
+    return undefined;
+  }
+}
+const ICON_SVG = loadAsset('../assets/icon.svg');
+const ICON_PNG = loadAsset('../assets/icon-512.png');
 
 type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -159,6 +171,14 @@ const httpServer = createHttpServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/health') {
       return sendJson(res, 200, { status: 'ok' });
+    }
+    if (req.method === 'GET' && url.pathname === '/icon.svg' && ICON_SVG) {
+      res.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' });
+      return void res.end(ICON_SVG);
+    }
+    if (req.method === 'GET' && (url.pathname === '/icon.png' || url.pathname === '/favicon.ico') && ICON_PNG) {
+      res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' });
+      return void res.end(ICON_PNG);
     }
     if (url.pathname !== MCP_PATH) {
       return sendJson(res, 404, { error: 'not found' });

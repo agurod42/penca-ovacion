@@ -1,7 +1,21 @@
+import { readFileSync } from 'node:fs';
+import { Buffer } from 'node:buffer';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { PencaClient } from 'penca-ovacion-sdk';
 import { z } from 'zod';
 import { buildClient } from './client.js';
+
+/** Load the server icon (bundled at packages/mcp/assets/icon.svg) as a data URI
+ *  so it can be advertised in serverInfo.icons without depending on a host. */
+function loadIconDataUri(): string | undefined {
+  try {
+    const svg = readFileSync(new URL('../assets/icon.svg', import.meta.url), 'utf8');
+    return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+  } catch {
+    return undefined;
+  }
+}
+const ICON_DATA_URI = loadIconDataUri();
 
 type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -29,7 +43,13 @@ const pagination = {
 };
 
 export function createServer(client: PencaClient = buildClient()): McpServer {
-  const server = new McpServer({ name: 'penca-ovacion', version: '0.1.0' });
+  const server = new McpServer({
+    name: 'penca-ovacion',
+    title: 'Penca Ovación',
+    version: '0.1.0',
+    websiteUrl: 'https://1930.dev',
+    ...(ICON_DATA_URI ? { icons: [{ src: ICON_DATA_URI, mimeType: 'image/svg+xml' }] } : {}),
+  });
 
   server.tool(
     'penca_whoami',
