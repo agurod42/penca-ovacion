@@ -1,11 +1,11 @@
+import { Buffer } from 'node:buffer';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { Buffer } from 'node:buffer';
-import { readFileSync } from 'node:fs';
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { MemoryTokenStore, PencaClient } from 'penca-ovacion-sdk';
 import { z } from 'zod';
 import { createServer } from './server.js';
@@ -143,7 +143,10 @@ async function handlePost(req: IncomingMessage, res: ServerResponse): Promise<vo
       if (transport.sessionId) delete transports[transport.sessionId];
     };
     // Fresh per-session client + server. In-memory tokens, isolated per user.
-    const client = new PencaClient({ tokens: new MemoryTokenStore(), baseUrl: process.env.PENCA_BASE_URL });
+    const client = new PencaClient({
+      tokens: new MemoryTokenStore(),
+      baseUrl: process.env.PENCA_BASE_URL,
+    });
     const server = createServer(client);
     registerAuthTools(server, client);
     await server.connect(transport);
@@ -173,10 +176,17 @@ const httpServer = createHttpServer(async (req, res) => {
       return sendJson(res, 200, { status: 'ok' });
     }
     if (req.method === 'GET' && url.pathname === '/icon.svg' && ICON_SVG) {
-      res.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' });
+      res.writeHead(200, {
+        'content-type': 'image/svg+xml',
+        'cache-control': 'public, max-age=86400',
+      });
       return void res.end(ICON_SVG);
     }
-    if (req.method === 'GET' && (url.pathname === '/icon.png' || url.pathname === '/favicon.ico') && ICON_PNG) {
+    if (
+      req.method === 'GET' &&
+      (url.pathname === '/icon.png' || url.pathname === '/favicon.ico') &&
+      ICON_PNG
+    ) {
       res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' });
       return void res.end(ICON_PNG);
     }
