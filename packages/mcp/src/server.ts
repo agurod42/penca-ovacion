@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { PencaClient } from 'penca-ovacion-sdk';
 import { z } from 'zod';
+import * as analytics from './analytics.js';
 import { buildClient } from './client.js';
 
 /** Load the server icon (bundled at packages/mcp/assets/icon.svg) as a data URI
@@ -23,16 +24,31 @@ function json(data: unknown): ToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
 }
 
-/** Wrap a handler so SDK errors become readable tool errors instead of crashes. */
-function guard<A>(fn: (args: A) => Promise<ToolResult>): (args: A) => Promise<ToolResult> {
+/**
+ * Wrap a tool handler so SDK errors become readable tool errors instead of
+ * crashes, and every call emits a fire-and-forget `mcp_tool_called` analytics
+ * event (status + bucketed duration). Analytics is a no-op unless the HTTP
+ * entrypoint armed it, so stdio runs pay nothing.
+ */
+function guard<A>(
+  tool: string,
+  fn: (args: A) => Promise<ToolResult>,
+): (args: A) => Promise<ToolResult> {
   return async (args: A) => {
+    const start = performance.now();
+    let status: 'ok' | 'error' = 'ok';
     try {
-      return await fn(args);
+      const result = await fn(args);
+      if (result.isError) status = 'error';
+      return result;
     } catch (err) {
+      status = 'error';
       return {
         content: [{ type: 'text', text: err instanceof Error ? err.message : String(err) }],
         isError: true,
       };
+    } finally {
+      analytics.trackTool(tool, status, performance.now() - start);
     }
   };
 }
@@ -55,7 +71,7 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
     'penca_whoami',
     'Show the authenticated Penca account.',
     {},
-    guard(async () => json(await client.me())),
+    guard('penca_whoami', async () => json(await client.me())),
   );
 
   server.tool(
@@ -66,7 +82,7 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
       fullName: z.string().optional(),
       country: z.string().optional(),
     },
-    guard(async ({ nickname, fullName, country }) =>
+    guard('penca_update_profile', async ({ nickname, fullName, country }) =>
       json(await client.updateProfile({ nickname, fullName, country })),
     ),
   );
@@ -75,7 +91,7 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
     'penca_tournaments',
     'List available tournaments.',
     {},
-    guard(async () => json(await client.tournaments.list())),
+    guard('penca_tournaments', async () => json(await client.tournaments.list())),
   );
 
   server.tool(
@@ -87,7 +103,7 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
       groupId: z.string().optional(),
       ...pagination,
     },
-    guard(async ({ tournamentId, view, groupId, page, limit }) =>
+    guard('penca_matches', async ({ tournamentId, view, groupId, page, limit }) =>
       json(await client.tournaments.matches(tournamentId, { view, groupId, page, limit })),
     ),
   );
@@ -96,7 +112,7 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
     'penca_match_statistics',
     'Aggregate prediction statistics for a match.',
     { matchId: z.string(), groupId: z.string().optional() },
-    guard(async ({ matchId, groupId }) =>
+    guard('penca_match_statistics', async ({ matchId, groupId }) =>
       json(await client.matches.statistics(matchId, { groupId })),
     ),
   );
@@ -105,14 +121,16 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
     'penca_ovi_prediction',
     "Ovi's AI score prediction and reasoning for a match.",
     { matchId: z.string() },
-    guard(async ({ matchId }) => json(await client.matches.oviPrediction(matchId))),
+    guard('penca_ovi_prediction', async ({ matchId }) =>
+      json(await client.matches.oviPrediction(matchId)),
+    ),
   );
 
   server.tool(
     'penca_predict',
     'Submit (or overwrite) your score prediction for a match.',
     { matchId: z.string(), homeScore: z.number().int().min(0), awayScore: z.number().int().min(0) },
-    guard(async ({ matchId, homeScore, awayScore }) =>
+    guard('penca_predict', async ({ matchId, homeScore, awayScore }) =>
       json(await client.matches.predict(matchId, { homeScore, awayScore })),
     ),
   );
@@ -121,28 +139,32 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
     'penca_digest',
     "Ovi's daily AI digest.",
     { kind: z.string().optional() },
-    guard(async ({ kind }) => json(await client.home.oviDigest(kind ?? 'home'))),
+    guard('penca_digest', async ({ kind }) => json(await client.home.oviDigest(kind ?? 'home'))),
   );
 
   server.tool(
     'penca_groups_mine',
     'Groups you belong to.',
     pagination,
-    guard(async ({ page, limit }) => json(await client.groups.mine({ page, limit }))),
+    guard('penca_groups_mine', async ({ page, limit }) =>
+      json(await client.groups.mine({ page, limit })),
+    ),
   );
 
   server.tool(
     'penca_groups_public',
     'Public/featured groups you can join.',
     pagination,
-    guard(async ({ page, limit }) => json(await client.groups.public({ page, limit }))),
+    guard('penca_groups_public', async ({ page, limit }) =>
+      json(await client.groups.public({ page, limit })),
+    ),
   );
 
   server.tool(
     'penca_ranking',
     'Leaderboard for a group.',
     { groupId: z.string(), ...pagination },
-    guard(async ({ groupId, page, limit }) =>
+    guard('penca_ranking', async ({ groupId, page, limit }) =>
       json(await client.groups.ranking(groupId, { page, limit })),
     ),
   );
@@ -151,7 +173,7 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
     'penca_wall_read',
     'Read social wall posts, optionally scoped to a group.',
     { groupId: z.string().optional(), ...pagination },
-    guard(async ({ groupId, page, limit }) =>
+    guard('penca_wall_read', async ({ groupId, page, limit }) =>
       json(await client.wall.posts({ groupId, page, limit })),
     ),
   );
@@ -160,28 +182,32 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
     'penca_wall_post',
     'Publish a post to a group wall.',
     { content: z.string(), groupId: z.string() },
-    guard(async ({ content, groupId }) => json(await client.wall.post({ content, groupId }))),
+    guard('penca_wall_post', async ({ content, groupId }) =>
+      json(await client.wall.post({ content, groupId })),
+    ),
   );
 
   server.tool(
     'penca_polls',
     'List active polls.',
     {},
-    guard(async () => json(await client.polls.list())),
+    guard('penca_polls', async () => json(await client.polls.list())),
   );
 
   server.tool(
     'penca_articles',
     'List news articles.',
     pagination,
-    guard(async ({ page, limit }) => json(await client.articles.list({ page, limit }))),
+    guard('penca_articles', async ({ page, limit }) =>
+      json(await client.articles.list({ page, limit })),
+    ),
   );
 
   server.tool(
     'penca_predictions',
     "A user's predictions and stats (defaults to yourself).",
     { userId: z.string().optional(), groupId: z.string().optional(), ...pagination },
-    guard(async ({ userId, groupId, page, limit }) => {
+    guard('penca_predictions', async ({ userId, groupId, page, limit }) => {
       const id = userId ?? (await client.me()).id;
       return json(await client.users.predictions(id, { groupId, page, limit }));
     }),

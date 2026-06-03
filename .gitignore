@@ -6,6 +6,7 @@ dist/
 .DS_Store
 .env
 .env.*
+!.env.example
 coverage/
 
 # Never commit raw captures or credentials
