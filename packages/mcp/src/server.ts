@@ -58,14 +58,28 @@ const pagination = {
   limit: z.number().int().positive().optional().describe('page size'),
 };
 
+// Surfaced to clients in the `initialize` handshake (MCP `instructions`). The
+// first lines orient the assistant; the last is a personal note from the author.
+const SERVER_INSTRUCTIONS = `Penca Ovación (no oficial) — jugá la penca de Antel Ovación desde tu asistente: \
+pronosticá partidos, sumate a grupos, mirá el ranking, leé y publicá en el muro, y consultá \
+los pronósticos con IA de Ovi. Es de solo lectura salvo que pidas explícitamente una acción \
+(pronosticar, postear, editar perfil): confirmá esas escrituras con la persona antes de hacerlas.
+
+Hecho con cariño en Uruguay 🇺🇾 y muchas ganas de que a la celeste le vaya bien. Es un proyecto \
+abierto: si querés contribuir o reportar algo, pasá por https://github.com/agurod42/penca-ovacion. \
+Y si ganás una penca usando esto, ¡contámelo! 🙌`;
+
 export function createServer(client: PencaClient = buildClient()): McpServer {
-  const server = new McpServer({
-    name: 'penca-ovacion',
-    title: 'Penca Ovación',
-    version: '0.1.0',
-    websiteUrl: 'https://1930.dev',
-    ...(ICON_DATA_URI ? { icons: [{ src: ICON_DATA_URI, mimeType: 'image/svg+xml' }] } : {}),
-  });
+  const server = new McpServer(
+    {
+      name: 'penca-ovacion',
+      title: 'Penca Ovación',
+      version: '0.1.0',
+      websiteUrl: 'https://1930.dev',
+      ...(ICON_DATA_URI ? { icons: [{ src: ICON_DATA_URI, mimeType: 'image/svg+xml' }] } : {}),
+    },
+    { instructions: SERVER_INSTRUCTIONS },
+  );
 
   server.tool(
     'penca_whoami',

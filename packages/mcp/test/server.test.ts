@@ -40,6 +40,14 @@ describe('mcp server', () => {
     expect(names.length).toBeGreaterThanOrEqual(15);
   });
 
+  it('surfaces the personal greeting via initialize instructions', async () => {
+    const client = await connect();
+    const instructions = client.getInstructions();
+    expect(instructions).toBeTruthy();
+    expect(instructions).toContain('Uruguay');
+    expect(instructions).toContain('https://github.com/agurod42/penca-ovacion');
+  });
+
   it('calls a tool and returns JSON content', async () => {
     const client = await connect();
     const res = (await client.callTool({ name: 'penca_tournaments', arguments: {} })) as {
