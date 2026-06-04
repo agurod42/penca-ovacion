@@ -3,7 +3,7 @@
 Cliente de línea de comandos para **Penca Antel Ovación** (no oficial).
 
 ```bash
-npm install -g penca-ovacion
+npm install -g penca-ovacion    # próximamente; por ahora usá la CLI desde el clon del repo
 penca login
 penca matches <tournamentId> --view upcoming
 penca predict <matchId> 2 1

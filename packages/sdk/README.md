@@ -3,7 +3,7 @@
 SDK tipado en TypeScript para la API de **Penca Antel Ovación** (no oficial).
 
 ```bash
-npm install penca-ovacion-sdk
+npm install penca-ovacion-sdk   # próximamente; por ahora usalo desde el clon del repo
 ```
 
 ```ts
