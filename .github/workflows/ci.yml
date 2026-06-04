@@ -1,12 +1,39 @@
 name: CI
 
+# Single pipeline for the monorepo. One workflow, three jobs gated in order:
+#
+#   test     — lint + build + typecheck + test. Runs on every push/PR/tag.
+#   image    — build & push the MCP Docker image to GHCR. Runs only after `test`
+#              passes, on push to main when MCP/SDK/Docker files changed (or via
+#              manual dispatch with task=image). Pulled by Dokploy to deploy.
+#   publish  — publish @1930dev/penca-ovacion-mcp to npm. Runs only after `test`
+#              passes, on a `mcp-v*` tag push (or manual dispatch with task=publish).
+#
+# Replaces the former separate ci.yml / build-mcp-image.yml / publish-npm.yml so
+# nothing ships unless CI is green.
+
 on:
   push:
     branches: [main]
+    tags: ['mcp-v*']
   pull_request:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Manual release task to run after CI passes'
+        type: choice
+        options: [none, image, publish]
+        default: none
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,3 +55,106 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test
+
+  # Detect whether image-relevant files changed, so a docs-only push to main
+  # doesn't trigger a Docker build. Only meaningful on a push to main.
+  changes:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      image: ${{ steps.filter.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            image:
+              - 'packages/mcp/**'
+              - 'packages/sdk/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - '.github/workflows/ci.yml'
+
+  # Build the MCP server image and push it to GitHub Container Registry.
+  # Image: ghcr.io/<owner>/penca-ovacion-mcp (linux/arm64, to match the ARM
+  # deploy host). `always()` lets this evaluate even when `changes` is skipped
+  # (e.g. manual dispatch); the explicit test-success check is the real gate.
+  image:
+    needs: [test, changes]
+    if: >-
+      always() && needs.test.result == 'success' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.image == 'true') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'image')
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/penca-ovacion-mcp
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Publish @1930dev/penca-ovacion-mcp to npm. Trigger by pushing a tag like
+  # `mcp-v0.1.0`, or via manual dispatch with task=publish. Requires repo secret
+  # NPM_TOKEN (an npm automation token with publish rights).
+  publish:
+    needs: [test]
+    if: >-
+      always() && needs.test.result == 'success' &&
+      (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/mcp-v')) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'publish')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build sdk + mcp
+        run: pnpm --filter penca-ovacion-sdk build && pnpm --filter "@1930dev/penca-ovacion-mcp" build
+
+      - name: Publish to npm
+        run: pnpm --filter "@1930dev/penca-ovacion-mcp" publish --no-git-checks --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
