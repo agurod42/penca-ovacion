@@ -8,6 +8,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { MemoryTokenStore, PencaClient } from 'penca-ovacion-sdk';
 import { z } from 'zod';
+import * as analytics from './analytics.js';
 import { createServer } from './server.js';
 
 /**
@@ -30,7 +31,13 @@ import { createServer } from './server.js';
  *                       query param (for connector UIs that only accept a URL).
  *   PENCA_BASE_URL      (optional) override the Penca API base URL
  *
+ *   OpenPanel analytics (server-side, off by default; HTTP transport only):
+ *   OPENPANEL_CLIENT_ID / OPENPANEL_CLIENT_SECRET   leave blank to disable
+ *   OPENPANEL_API_URL   OpenPanel REST base (default https://api.openpanel.dev)
+ *   OPENPANEL_DEBUG     set to 1 to log every successful send to stderr
+ *
  * `GET /health` (unauthenticated) returns 200 for health checks.
+ * `GET /analytics/stats` (unauthenticated) returns OpenPanel send counters.
  */
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -125,8 +132,34 @@ function registerAuthTools(server: McpServer, client: PencaClient): void {
 // Active sessions: sessionId -> transport.
 const transports: Record<string, StreamableHTTPServerTransport> = {};
 
+/** Lowercased single-valued header view for analytics (Node headers may be arrays). */
+function headerRecord(req: IncomingMessage): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (typeof v === 'string') out[k] = v;
+    else if (Array.isArray(v)) out[k] = v[0] ?? '';
+  }
+  return out;
+}
+
+/** Capture inbound-request attribution for fire-and-forget analytics. */
+function requestCtx(req: IncomingMessage): analytics.RequestCtx {
+  const forwarded = (req.headers['x-forwarded-for'] as string | undefined) ?? '';
+  const clientIp = forwarded
+    ? (forwarded.split(',')[0]?.trim() ?? '')
+    : (req.socket.remoteAddress ?? '');
+  return {
+    origin: (req.headers.origin as string | undefined) ?? '',
+    clientIp,
+    userAgent: (req.headers['user-agent'] as string | undefined) ?? '',
+    mcpSessionId: (req.headers['mcp-session-id'] as string | undefined) ?? '',
+  };
+}
+
 async function handlePost(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody(req);
+  // Best-effort: count JSON-RPC methods and emit mcp_session_started on initialize.
+  analytics.recordJsonRpc(body, headerRecord(req));
   const sid = req.headers['mcp-session-id'] as string | undefined;
 
   let transport: StreamableHTTPServerTransport;
@@ -175,6 +208,11 @@ const httpServer = createHttpServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/health') {
       return sendJson(res, 200, { status: 'ok' });
     }
+    // Read-only OpenPanel send-outcome counters, so a single curl confirms
+    // events are landing (sent_ok rising) vs silently failing. Unauthenticated.
+    if (req.method === 'GET' && url.pathname === '/analytics/stats') {
+      return sendJson(res, 200, analytics.stats());
+    }
     if (req.method === 'GET' && url.pathname === '/icon.svg' && ICON_SVG) {
       res.writeHead(200, {
         'content-type': 'image/svg+xml',
@@ -197,8 +235,15 @@ const httpServer = createHttpServer(async (req, res) => {
       return sendJson(res, 401, { error: 'unauthorized' });
     }
 
-    if (req.method === 'POST') return await handlePost(req, res);
-    if (req.method === 'GET' || req.method === 'DELETE') return await handleSession(req, res);
+    // Run the MCP dispatch inside the request's analytics context so tool
+    // handlers can attribute events to a stable anonymous profile.
+    const ctx = requestCtx(req);
+    if (req.method === 'POST') {
+      return await analytics.runWithContext(ctx, () => handlePost(req, res));
+    }
+    if (req.method === 'GET' || req.method === 'DELETE') {
+      return await analytics.runWithContext(ctx, () => handleSession(req, res));
+    }
     return sendJson(res, 405, { error: 'method not allowed' });
   } catch (err) {
     if (!res.headersSent) {
@@ -207,9 +252,14 @@ const httpServer = createHttpServer(async (req, res) => {
   }
 });
 
+// Arm OpenPanel (no-op unless OPENPANEL_CLIENT_ID/SECRET are set). HTTP only;
+// the stdio entrypoint never calls this, so stdio runs stay silent.
+analytics.init();
+
 httpServer.listen(PORT, () => {
   console.error(`penca-ovacion MCP (Streamable HTTP, multi-user) listening on :${PORT}${MCP_PATH}`);
   if (!BEARER) {
     console.error('WARNING: MCP_BEARER_SECRET not set — the endpoint is unauthenticated');
   }
+  analytics.track('mcp_server_started', { transport: 'http', port: PORT });
 });

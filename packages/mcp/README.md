@@ -77,6 +77,20 @@ entorno del server local (Opción 2) y saltarte el login.
 `penca_predict`, `penca_digest`, `penca_groups_mine`, `penca_groups_public`, `penca_ranking`,
 `penca_wall_read`, `penca_wall_post`, `penca_polls`, `penca_articles`, `penca_predictions`.
 
+## Analítica (opcional)
+
+El despliegue *hosted* (Streamable HTTP) puede reportar uso agregado a
+[OpenPanel](https://openpanel.dev) del lado del servidor. Está **apagado por defecto** y es
+*fire-and-forget*: nunca demora ni rompe una respuesta de tool. Las corridas locales por
+`stdio` no lo activan nunca.
+
+Se habilita seteando `OPENPANEL_CLIENT_ID` y `OPENPANEL_CLIENT_SECRET` (ver
+[`.env.example`](./.env.example)). Eventos emitidos: `mcp_server_started`,
+`mcp_session_started` (en `initialize`) y `mcp_tool_called` (con tool, estado y duración en
+buckets). No se guarda PII: el `profileId` es un hash anónimo y estable de `Origin + IP`, la
+IP nunca se persiste en claro. `GET /analytics/stats` expone contadores de envío para
+verificar que los eventos están llegando.
+
 Mirá el [README del repositorio](https://github.com/agurod42/penca-ovacion#readme) para el
 toolkit completo (SDK + CLI). **No oficial** — sin afiliación con Ovación/Antel/FutbolX.
 
