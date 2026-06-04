@@ -7,6 +7,6 @@ export default defineConfig({
   sourcemap: true,
   target: 'node20',
   noExternal: ['penca-ovacion-sdk'],
-  external: ['keytar', '@modelcontextprotocol/sdk', 'zod'],
+  external: ['keytar', 'better-sqlite3', '@modelcontextprotocol/sdk', 'zod'],
   banner: { js: '#!/usr/bin/env node' },
 });

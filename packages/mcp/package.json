@@ -11,13 +11,28 @@
     "url": "https://github.com/agurod42/penca-ovacion.git",
     "directory": "packages/mcp"
   },
-  "keywords": ["penca", "ovacion", "mcp", "model-context-protocol", "llm", "claude"],
-  "engines": { "node": ">=20" },
+  "keywords": [
+    "penca",
+    "ovacion",
+    "mcp",
+    "model-context-protocol",
+    "llm",
+    "claude"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "bin": {
     "penca-mcp": "./dist/index.js"
   },
-  "files": ["dist", "assets", "README.md"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "dist",
+    "assets",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
@@ -26,12 +41,14 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.0",
+    "better-sqlite3": "^11.10.0",
     "zod": "^3.23.8"
   },
   "optionalDependencies": {
     "keytar": "^7.9.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "penca-ovacion-sdk": "workspace:*"
   }
 }
