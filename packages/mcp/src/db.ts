@@ -29,6 +29,41 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
   client_name   TEXT,
   created_at    INTEGER NOT NULL
 );
+
+-- Short-lived, single-use authorization codes (PKCE).
+CREATE TABLE IF NOT EXISTS auth_codes (
+  code           TEXT PRIMARY KEY,
+  subject        TEXT NOT NULL,
+  client_id      TEXT NOT NULL,
+  redirect_uri   TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  resource       TEXT,
+  scope          TEXT,
+  expires_at     INTEGER NOT NULL
+);
+
+-- Issued refresh tokens (our own), mapping back to a Penca subject.
+CREATE TABLE IF NOT EXISTS sessions (
+  refresh_token TEXT PRIMARY KEY,
+  subject       TEXT NOT NULL,
+  client_id     TEXT NOT NULL,
+  scope         TEXT,
+  created_at    INTEGER NOT NULL,
+  last_used_at  INTEGER
+);
+
+-- In-flight browser sign-ins between the email step and the magic-link step.
+CREATE TABLE IF NOT EXISTS pending_logins (
+  login_id       TEXT PRIMARY KEY,
+  client_id      TEXT NOT NULL,
+  redirect_uri   TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  state          TEXT,
+  scope          TEXT,
+  resource       TEXT,
+  email          TEXT,
+  expires_at     INTEGER NOT NULL
+);
 `;
 
 /**

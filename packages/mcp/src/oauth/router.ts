@@ -1,24 +1,33 @@
+import {
+  handleAuthorizeComplete,
+  handleAuthorizeEmail,
+  handleAuthorizeStart,
+} from './authorize.js';
 import type { ClientStore } from './clients.js';
-import type { OAuthConfig } from './config.js';
 import { authorizationServerMetadata, protectedResourceMetadata } from './metadata.js';
+import { handleToken } from './token-endpoint.js';
+import type { OAuthDeps, OAuthResult } from './types.js';
 
-/** A JSON response for an OAuth endpoint. */
-export interface OAuthResult {
-  status: number;
-  body: unknown;
-  headers?: Record<string, string>;
+function parseForm(raw: string | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!raw) return out;
+  for (const [key, value] of new URLSearchParams(raw)) out[key] = value;
+  return out;
 }
 
-export interface OAuthDeps {
-  config: OAuthConfig;
-  clients: ClientStore;
+function parseJson(raw: string | undefined): unknown {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
 }
 
 function isAbsoluteUri(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   try {
-    // Absolute URIs only (must have a scheme); throws on relative.
-    new URL(value);
+    new URL(value); // absolute URIs only (must have a scheme); throws on relative
     return true;
   } catch {
     return false;
@@ -59,34 +68,39 @@ function registerClient(body: unknown, clients: ClientStore): OAuthResult {
 }
 
 /**
- * Handle the OAuth discovery + registration routes. Returns `null` when the
- * request is not an OAuth route, so the caller can fall through to the MCP
- * transport. Authorization/token/revocation land in later sub-steps.
+ * Route the OAuth discovery, registration, authorization and token endpoints.
+ * Returns `null` when the request is not an OAuth route, so the caller can fall
+ * through to the MCP transport.
  */
-export function handleOAuth(
+export async function handleOAuth(
   method: string,
-  pathname: string,
-  body: unknown,
+  url: URL,
+  rawBody: string | undefined,
   deps: OAuthDeps,
-): OAuthResult | null {
-  const { config, clients } = deps;
+): Promise<OAuthResult | null> {
+  const path = url.pathname;
 
   if (method === 'GET') {
-    // RFC 9728: clients may request the metadata with or without the resource
-    // path suffix; serve both.
     if (
-      pathname === '/.well-known/oauth-protected-resource' ||
-      pathname === `/.well-known/oauth-protected-resource${config.mcpPath}`
+      path === '/.well-known/oauth-protected-resource' ||
+      path === `/.well-known/oauth-protected-resource${deps.config.mcpPath}`
     ) {
-      return { status: 200, body: protectedResourceMetadata(config) };
+      return { status: 200, body: protectedResourceMetadata(deps.config) };
     }
-    if (pathname === '/.well-known/oauth-authorization-server') {
-      return { status: 200, body: authorizationServerMetadata(config) };
+    if (path === '/.well-known/oauth-authorization-server') {
+      return { status: 200, body: authorizationServerMetadata(deps.config) };
+    }
+    if (path === '/oauth/authorize') {
+      return handleAuthorizeStart(url.searchParams, deps);
     }
   }
 
-  if (method === 'POST' && pathname === '/oauth/register') {
-    return registerClient(body, clients);
+  if (method === 'POST') {
+    if (path === '/oauth/register') return registerClient(parseJson(rawBody), deps.clients);
+    if (path === '/oauth/authorize/email') return handleAuthorizeEmail(parseForm(rawBody), deps);
+    if (path === '/oauth/authorize/complete')
+      return handleAuthorizeComplete(parseForm(rawBody), deps);
+    if (path === '/oauth/token') return handleToken(parseForm(rawBody), deps);
   }
 
   return null;

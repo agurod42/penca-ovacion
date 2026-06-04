@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -9,10 +9,13 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { MemoryTokenStore, PencaClient } from 'penca-ovacion-sdk';
 import { z } from 'zod';
 import * as analytics from './analytics.js';
+import { codecFromEnv } from './crypto.js';
 import { openDb } from './db.js';
 import { ClientStore } from './oauth/clients.js';
 import { resolveOAuthConfig } from './oauth/config.js';
 import { handleOAuth } from './oauth/router.js';
+import { AuthCodeStore, PendingLoginStore, SessionStore } from './oauth/store.js';
+import type { OAuthDeps } from './oauth/types.js';
 import { createServer } from './server.js';
 
 /**
@@ -53,11 +56,34 @@ const PORT = Number(process.env.PORT ?? 3000);
 const MCP_PATH = process.env.MCP_PATH ?? '/mcp';
 const BEARER = process.env.MCP_BEARER_SECRET;
 
-// Server-side state (sessions, OAuth clients). Opened once at startup; the
-// OAuth authorization server is built on top in later sub-steps.
+const ACCESS_TTL_SEC = Number(process.env.MCP_ACCESS_TTL_SEC ?? 3600);
+
+function resolveJwtSecret(): string {
+  const secret = process.env.MCP_JWT_SECRET;
+  if (secret) return secret;
+  console.error(
+    'WARNING: MCP_JWT_SECRET not set — using an ephemeral secret; issued sessions die on restart.',
+  );
+  return randomBytes(32).toString('hex');
+}
+
+// Server-side state (identities, OAuth clients, codes, sessions, pending
+// logins). Opened once at startup and shared across requests.
 const db = openDb();
 const oauthConfig = resolveOAuthConfig();
-const clients = new ClientStore(db);
+const oauthDeps: OAuthDeps = {
+  config: oauthConfig,
+  clients: new ClientStore(db),
+  codes: new AuthCodeStore(db),
+  sessions: new SessionStore(db),
+  pending: new PendingLoginStore(db),
+  db,
+  codec: codecFromEnv(),
+  jwtSecret: resolveJwtSecret(),
+  accessTtlSec: ACCESS_TTL_SEC,
+  createPencaClient: () =>
+    new PencaClient({ tokens: new MemoryTokenStore(), baseUrl: process.env.PENCA_BASE_URL }),
+};
 
 /** Server icon, served (unauthenticated) at /icon.svg, /icon.png, /favicon.ico. */
 function loadAsset(rel: string): Buffer | undefined {
@@ -99,12 +125,17 @@ function authOk(header: string | undefined, queryToken: string | null): boolean 
   return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+async function readRawBody(req: IncomingMessage): Promise<string | undefined> {
   const chunks: Buffer[] = [];
   for await (const c of req) chunks.push(c as Buffer);
-  if (chunks.length === 0) return undefined;
+  return chunks.length === 0 ? undefined : Buffer.concat(chunks).toString('utf8');
+}
+
+async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  const raw = await readRawBody(req);
+  if (raw === undefined) return undefined;
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return JSON.parse(raw);
   } catch {
     return undefined;
   }
@@ -243,21 +274,22 @@ const httpServer = createHttpServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' });
       return void res.end(ICON_PNG);
     }
-    // OAuth discovery + dynamic client registration (additive; does not yet
-    // gate the MCP endpoint — token validation lands in a later sub-step).
-    const oauthNeedsBody = req.method === 'POST' && url.pathname === '/oauth/register';
-    const oauthResult = handleOAuth(
-      req.method ?? 'GET',
-      url.pathname,
-      oauthNeedsBody ? await readJsonBody(req) : undefined,
-      { config: oauthConfig, clients },
-    );
-    if (oauthResult) {
-      res.writeHead(oauthResult.status, {
-        'content-type': 'application/json',
-        ...oauthResult.headers,
-      });
-      return void res.end(JSON.stringify(oauthResult.body));
+    // OAuth: discovery, registration, authorization and token endpoints
+    // (additive; does not yet gate /mcp — token validation lands in sub-step 5).
+    const isOAuthRoute =
+      url.pathname.startsWith('/oauth/') || url.pathname.startsWith('/.well-known/oauth');
+    if (isOAuthRoute) {
+      const rawBody = req.method === 'POST' ? await readRawBody(req) : undefined;
+      const result = await handleOAuth(req.method ?? 'GET', url, rawBody, oauthDeps);
+      if (result) {
+        const isJson = !result.headers?.['content-type'];
+        res.writeHead(result.status, {
+          ...(isJson ? { 'content-type': 'application/json' } : {}),
+          ...result.headers,
+        });
+        return void res.end(isJson ? JSON.stringify(result.body) : String(result.body));
+      }
+      return sendJson(res, 404, { error: 'not found' });
     }
 
     if (url.pathname !== MCP_PATH) {
