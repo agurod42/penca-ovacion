@@ -89,6 +89,16 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
   );
 
   server.tool(
+    'penca_logout',
+    'Sign out: revoke the Penca session server-side and clear the stored tokens for this connection.',
+    {},
+    guard('penca_logout', async () => {
+      await client.logout();
+      return json({ loggedOut: true });
+    }),
+  );
+
+  server.tool(
     'penca_update_profile',
     'Update your profile (nickname, full name, country). Returns the updated account.',
     {

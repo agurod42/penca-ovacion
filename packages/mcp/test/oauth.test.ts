@@ -241,4 +241,30 @@ describe('authorization code flow with PKCE', () => {
     expect(loc.searchParams.get('error')).toBe('invalid_request');
     expect(loc.searchParams.get('state')).toBe('s');
   });
+
+  it('revokes a refresh token so it can no longer be exchanged', async () => {
+    const deps = makeDeps();
+    const clientId = await registerClient(deps);
+    const { verifier, challenge } = pkce();
+    const code = await fullFlow(deps, clientId, challenge);
+    const tok = await call(deps, 'POST', '/oauth/token', {
+      body: form({
+        grant_type: 'authorization_code',
+        code,
+        code_verifier: verifier,
+        client_id: clientId,
+      }),
+    });
+    const refreshToken = (tok?.body as { refresh_token: string }).refresh_token;
+
+    const revoke = await call(deps, 'POST', '/oauth/revoke', {
+      body: form({ token: refreshToken }),
+    });
+    expect(revoke?.status).toBe(200); // RFC 7009: always 200
+
+    const after = await call(deps, 'POST', '/oauth/token', {
+      body: form({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+    });
+    expect(after?.status).toBe(400);
+  });
 });

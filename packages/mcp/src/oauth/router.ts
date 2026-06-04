@@ -67,6 +67,13 @@ function registerClient(body: unknown, clients: ClientStore): OAuthResult {
   };
 }
 
+/** Token revocation (RFC 7009). Always responds 200, even for unknown tokens. */
+function revokeToken(form: Record<string, string>, deps: OAuthDeps): OAuthResult {
+  const token = form.token;
+  if (token) deps.sessions.delete(token); // we track refresh tokens; access JWTs are stateless
+  return { status: 200, body: {} };
+}
+
 /**
  * Route the OAuth discovery, registration, authorization and token endpoints.
  * Returns `null` when the request is not an OAuth route, so the caller can fall
@@ -101,6 +108,7 @@ export async function handleOAuth(
     if (path === '/oauth/authorize/complete')
       return handleAuthorizeComplete(parseForm(rawBody), deps);
     if (path === '/oauth/token') return handleToken(parseForm(rawBody), deps);
+    if (path === '/oauth/revoke') return revokeToken(parseForm(rawBody), deps);
   }
 
   return null;
