@@ -9,6 +9,10 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { MemoryTokenStore, PencaClient } from 'penca-ovacion-sdk';
 import { z } from 'zod';
 import * as analytics from './analytics.js';
+import { openDb } from './db.js';
+import { ClientStore } from './oauth/clients.js';
+import { resolveOAuthConfig } from './oauth/config.js';
+import { handleOAuth } from './oauth/router.js';
 import { createServer } from './server.js';
 
 /**
@@ -26,6 +30,10 @@ import { createServer } from './server.js';
  * Env:
  *   PORT                listen port (default 3000)
  *   MCP_PATH            request path for MCP (default /mcp)
+ *   MCP_PUBLIC_URL      canonical public origin for OAuth metadata
+ *                       (e.g. https://penca-ovacion.1930.dev; default localhost)
+ *   MCP_DB_PATH         SQLite path (default /data/penca-mcp.db, the mounted volume)
+ *   MCP_TOKEN_ENC_KEY   32-byte key (hex/base64) to encrypt refresh tokens at rest
  *   MCP_BEARER_SECRET   if set, requests must present the secret either as
  *                       `Authorization: Bearer <secret>` or as a `?token=<secret>`
  *                       query param (for connector UIs that only accept a URL).
@@ -38,11 +46,18 @@ import { createServer } from './server.js';
  *
  * `GET /health` (unauthenticated) returns 200 for health checks.
  * `GET /analytics/stats` (unauthenticated) returns OpenPanel send counters.
+ * The OAuth discovery documents under `/.well-known/` are served without a gate.
  */
 
 const PORT = Number(process.env.PORT ?? 3000);
 const MCP_PATH = process.env.MCP_PATH ?? '/mcp';
 const BEARER = process.env.MCP_BEARER_SECRET;
+
+// Server-side state (sessions, OAuth clients). Opened once at startup; the
+// OAuth authorization server is built on top in later sub-steps.
+const db = openDb();
+const oauthConfig = resolveOAuthConfig();
+const clients = new ClientStore(db);
 
 /** Server icon, served (unauthenticated) at /icon.svg, /icon.png, /favicon.ico. */
 function loadAsset(rel: string): Buffer | undefined {
@@ -228,6 +243,23 @@ const httpServer = createHttpServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' });
       return void res.end(ICON_PNG);
     }
+    // OAuth discovery + dynamic client registration (additive; does not yet
+    // gate the MCP endpoint — token validation lands in a later sub-step).
+    const oauthNeedsBody = req.method === 'POST' && url.pathname === '/oauth/register';
+    const oauthResult = handleOAuth(
+      req.method ?? 'GET',
+      url.pathname,
+      oauthNeedsBody ? await readJsonBody(req) : undefined,
+      { config: oauthConfig, clients },
+    );
+    if (oauthResult) {
+      res.writeHead(oauthResult.status, {
+        'content-type': 'application/json',
+        ...oauthResult.headers,
+      });
+      return void res.end(JSON.stringify(oauthResult.body));
+    }
+
     if (url.pathname !== MCP_PATH) {
       return sendJson(res, 404, { error: 'not found' });
     }

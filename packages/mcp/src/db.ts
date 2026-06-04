@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import Database from 'better-sqlite3';
 
 /** A connected better-sqlite3 database handle. */
@@ -20,6 +22,13 @@ CREATE TABLE IF NOT EXISTS penca_identities (
   email         TEXT,
   updated_at    INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS oauth_clients (
+  client_id     TEXT PRIMARY KEY,
+  redirect_uris TEXT NOT NULL,   -- JSON array of absolute URIs
+  client_name   TEXT,
+  created_at    INTEGER NOT NULL
+);
 `;
 
 /**
@@ -27,6 +36,9 @@ CREATE TABLE IF NOT EXISTS penca_identities (
  * to `MCP_DB_PATH` or the container's mounted volume; pass `:memory:` in tests.
  */
 export function openDb(path = process.env.MCP_DB_PATH ?? '/data/penca-mcp.db'): Db {
+  if (path !== ':memory:') {
+    mkdirSync(dirname(path), { recursive: true });
+  }
   const db = new Database(path);
   if (path !== ':memory:') {
     // WAL gives readers/writers concurrency and survives unclean shutdowns.
