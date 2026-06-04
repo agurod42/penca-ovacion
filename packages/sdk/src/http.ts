@@ -1,4 +1,4 @@
-import { PencaAuthError, PencaError, PencaHttpError } from './errors.js';
+import { type AuthErrorCode, PencaAuthError, PencaError, PencaHttpError } from './errors.js';
 
 export type QueryValue = string | number | boolean | undefined | null;
 
@@ -84,6 +84,9 @@ export class Http {
       // Try a refresh in case only a refresh token is present.
       if (await this.config.auth.refresh()) token = await this.config.auth.getAccessToken();
     }
+    // Whether we ever had credentials to send — distinguishes "never signed in"
+    // (NO_TOKEN) from "session rejected" (SESSION_INVALID) on a 401.
+    let hadCredentials = token != null;
 
     let res: Response;
     try {
@@ -95,6 +98,7 @@ export class Http {
     // One-shot refresh-and-retry on 401.
     if (res.status === 401 && useAuth && (await this.config.auth.refresh())) {
       const refreshed = await this.config.auth.getAccessToken();
+      if (refreshed) hadCredentials = true;
       try {
         res = await send(refreshed);
       } catch (cause) {
@@ -106,17 +110,27 @@ export class Http {
 
     const body = await parseBody(res);
     if (res.status === 401 || res.status === 403) {
-      throw new PencaAuthError(authMessage(body), { cause: body });
+      const code: AuthErrorCode =
+        res.status === 403 ? 'FORBIDDEN' : hadCredentials ? 'SESSION_INVALID' : 'NO_TOKEN';
+      throw new PencaAuthError(authMessage(body, code), { cause: body, code });
     }
     throw new PencaHttpError({ status: res.status, body, method: options.method ?? 'GET', path });
   }
 }
 
-function authMessage(body: unknown): string {
+/**
+ * Build a neutral, surface-agnostic auth error message. Prefers the server's
+ * own message when present; otherwise a generic line keyed off the cause. The
+ * SDK deliberately avoids prescribing an action (e.g. "run `penca login`") so
+ * each surface can map {@link AuthErrorCode} to its own guidance.
+ */
+function authMessage(body: unknown, code: AuthErrorCode): string {
   if (body && typeof body === 'object' && 'message' in body) {
     const msg = (body as { message: unknown }).message;
-    if (typeof msg === 'string') return msg;
-    if (Array.isArray(msg)) return msg.join(', ');
+    if (typeof msg === 'string' && msg.length > 0) return msg;
+    if (Array.isArray(msg) && msg.length > 0) return msg.join(', ');
   }
-  return 'Not authenticated. Run `penca login` first.';
+  if (code === 'FORBIDDEN') return 'Not allowed to access this resource.';
+  if (code === 'SESSION_INVALID') return 'Session expired or was revoked.';
+  return 'Not authenticated.';
 }

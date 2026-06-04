@@ -1,5 +1,6 @@
 import { PencaAuthError } from './errors.js';
 import { type AuthHook, Http, type RequestOptions } from './http.js';
+import { decodeJwt } from './jwt.js';
 import { Articles, Home, Polls, Users } from './resources/content.js';
 import { Groups } from './resources/groups.js';
 import { Matches } from './resources/matches.js';
@@ -39,6 +40,20 @@ export interface LoginInput {
 export interface LoginResult {
   tokens: Tokens;
   user?: CurrentUser;
+}
+
+/** Local, offline view of the stored session (no network round-trip). */
+export interface SessionStatus {
+  /** An access token is present locally (not a guarantee the server accepts it). */
+  authenticated: boolean;
+  /** Access-token expiry, or null if absent/unparseable. */
+  expiresAt: Date | null;
+  /** Seconds until expiry (negative if already expired), or null if unknown. */
+  expiresInSec: number | null;
+  /** True when the token is missing, expired, or within `skewSeconds` of expiry. */
+  needsRefresh: boolean;
+  /** Whether a refresh token is available to renew the session. */
+  canRefresh: boolean;
 }
 
 /**
@@ -277,6 +292,45 @@ export class PencaClient implements AuthHook {
   /** Whether an access token is currently available. */
   async isAuthenticated(): Promise<boolean> {
     return (await this.getAccessToken()) !== null;
+  }
+
+  /**
+   * Inspect the stored session locally — token presence and JWT expiry — without
+   * hitting the network. Useful for `whoami`-style status checks and deciding
+   * whether to refresh proactively. `skewSeconds` treats a token expiring soon
+   * as already needing a refresh.
+   */
+  async sessionStatus(skewSeconds = 30): Promise<SessionStatus> {
+    const accessToken = await this.getAccessToken();
+    const canRefresh = this.cached?.refreshToken != null;
+    if (!accessToken) {
+      return {
+        authenticated: false,
+        expiresAt: null,
+        expiresInSec: null,
+        needsRefresh: true,
+        canRefresh,
+      };
+    }
+    const exp = decodeJwt(accessToken)?.exp;
+    if (!exp) {
+      return {
+        authenticated: true,
+        expiresAt: null,
+        expiresInSec: null,
+        needsRefresh: false,
+        canRefresh,
+      };
+    }
+    const expiresAt = new Date(exp * 1000);
+    const expiresInSec = Math.round((expiresAt.getTime() - Date.now()) / 1000);
+    return {
+      authenticated: true,
+      expiresAt,
+      expiresInSec,
+      needsRefresh: expiresInSec <= skewSeconds,
+      canRefresh,
+    };
   }
 
   /** Manually set and persist tokens (e.g. pasted from another source). */

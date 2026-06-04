@@ -40,7 +40,14 @@ export async function run(fn: () => Promise<void>): Promise<void> {
       console.error(err);
     }
     if (err instanceof PencaAuthError) {
-      fail(`${err.message}`);
+      // Map the SDK's surface-agnostic code to CLI-specific guidance.
+      const hint =
+        err.code === 'FORBIDDEN'
+          ? ''
+          : err.code === 'SESSION_INVALID'
+            ? ' Run `penca login` to sign in again.'
+            : ' Run `penca login` first.';
+      fail(`${err.message}${hint}`);
     }
     if (err instanceof PencaHttpError) {
       fail(err.message);

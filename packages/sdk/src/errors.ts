@@ -6,14 +6,28 @@ export class PencaError extends Error {
   }
 }
 
+/**
+ * Why an authentication/authorization failure happened, so each surface (CLI,
+ * MCP, app) can render its own actionable guidance instead of a shared,
+ * surface-specific message baked into the SDK.
+ *
+ * - `NO_TOKEN`        — no credentials were available at all (never signed in).
+ * - `SESSION_INVALID` — a token was present but the server rejected it and it
+ *                       could not be refreshed (expired/revoked session).
+ * - `FORBIDDEN`       — authenticated, but not allowed to access the resource.
+ * - `UNKNOWN`         — auth failure with no further classification.
+ */
+export type AuthErrorCode = 'NO_TOKEN' | 'SESSION_INVALID' | 'FORBIDDEN' | 'UNKNOWN';
+
 /** Thrown when the request fails because of authentication/authorization. */
 export class PencaAuthError extends PencaError {
-  constructor(
-    message = 'Not authenticated. Run `penca login` first.',
-    options?: { cause?: unknown },
-  ) {
-    super(message, options);
+  /** Machine-readable cause; consumers map this to surface-specific guidance. */
+  readonly code: AuthErrorCode;
+
+  constructor(message = 'Not authenticated.', options?: { cause?: unknown; code?: AuthErrorCode }) {
+    super(message, { cause: options?.cause });
     this.name = 'PencaAuthError';
+    this.code = options?.code ?? 'UNKNOWN';
   }
 }
 

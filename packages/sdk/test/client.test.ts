@@ -85,6 +85,49 @@ describe('error mapping', () => {
     const { c } = client([{ status: 401, json: { message: 'Unauthorized' } }]);
     await expect(c.tournaments.list()).rejects.toBeInstanceOf(PencaAuthError);
   });
+
+  it('codes a 401 with no stored token as NO_TOKEN', async () => {
+    const { c } = client([{ status: 401, json: {} }], new MemoryTokenStore());
+    await expect(c.tournaments.list()).rejects.toMatchObject({ code: 'NO_TOKEN' });
+  });
+
+  it('codes a 401 with a stored token as SESSION_INVALID', async () => {
+    const { c } = client([{ status: 401, json: {} }]);
+    await expect(c.tournaments.list()).rejects.toMatchObject({ code: 'SESSION_INVALID' });
+  });
+
+  it('codes a 403 as FORBIDDEN', async () => {
+    const { c } = client([{ status: 403, json: {} }]);
+    await expect(c.tournaments.list()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+});
+
+describe('sessionStatus', () => {
+  it('reports an authenticated, non-expiring session from the JWT', async () => {
+    const { c } = client([]);
+    const status = await c.sessionStatus();
+    expect(status.authenticated).toBe(true);
+    expect(status.needsRefresh).toBe(false);
+    expect(status.expiresAt?.getUTCFullYear()).toBe(2098);
+  });
+
+  it('reports an unauthenticated session when no token is stored', async () => {
+    const { c } = client([], new MemoryTokenStore());
+    const status = await c.sessionStatus();
+    expect(status).toMatchObject({
+      authenticated: false,
+      expiresAt: null,
+      needsRefresh: true,
+      canRefresh: false,
+    });
+  });
+
+  it('flags needsRefresh when within the skew window', async () => {
+    const { c } = client([]);
+    // fakeJwt expires in 2099; a skew larger than that window forces needsRefresh.
+    const status = await c.sessionStatus(10 ** 12);
+    expect(status.needsRefresh).toBe(true);
+  });
 });
 
 describe('refresh flow', () => {

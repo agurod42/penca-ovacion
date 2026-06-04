@@ -7,12 +7,13 @@ export {
   extractTokens,
   extractMagicToken,
 } from './client.js';
-export type { PencaClientOptions, LoginInput, LoginResult } from './client.js';
+export type { PencaClientOptions, LoginInput, LoginResult, SessionStatus } from './client.js';
 
 export { Http } from './http.js';
 export type { AuthHook, RequestOptions, FetchLike, QueryValue, HttpConfig } from './http.js';
 
 export { PencaError, PencaAuthError, PencaHttpError } from './errors.js';
+export type { AuthErrorCode } from './errors.js';
 
 export {
   type TokenStore,
