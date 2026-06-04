@@ -14,7 +14,7 @@ servidor MCP), así que ninguna integración reimplementa la API.
 ## El camino universal: MCP
 
 Para la mayoría de las integraciones con LLMs, preferí el **servidor MCP**
-(`penca-ovacion-mcp`) por sobre un wrapper a medida — ya expone cada capacidad como
+(`@1930dev/penca-ovacion-mcp`) por sobre un wrapper a medida — ya expone cada capacidad como
 herramientas tipadas y funciona con cualquier cliente compatible con MCP (Claude Desktop,
 Claude Code y una lista creciente de otros). Mirá [`packages/mcp`](../packages/mcp).
 

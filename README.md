@@ -85,7 +85,7 @@ tanto la CLI como el servidor MCP lo usan en lugar de la sesión guardada.
 | --- | --- | --- |
 | [`packages/sdk`](packages/sdk) | `penca-ovacion-sdk` | Cliente tipado en TypeScript para la API. Sin dependencias de CLI — la base sobre la que se construye todo lo demás. |
 | [`packages/cli`](packages/cli) | `penca-ovacion` (`penca`) | El cliente de línea de comandos. |
-| [`packages/mcp`](packages/mcp) | `penca-ovacion-mcp` (`penca-mcp`) | Un servidor [Model Context Protocol](https://modelcontextprotocol.io) que expone la penca como herramientas para Claude y cualquier cliente MCP. |
+| [`packages/mcp`](packages/mcp) | [`@1930dev/penca-ovacion-mcp`](https://www.npmjs.com/package/@1930dev/penca-ovacion-mcp) (`penca-mcp`) | Un servidor [Model Context Protocol](https://modelcontextprotocol.io) que expone la penca como herramientas para Claude y cualquier cliente MCP. Publicado en npm y disponible hosted. |
 | [`skills/claude`](skills) | — | Un [Agent Skill](https://docs.claude.com) de Anthropic que envuelve la CLI. |
 
 ## Usando el SDK
@@ -107,15 +107,26 @@ const allPosts = await collect(paginate((page) => penca.wall.posts({ page, limit
 
 ## Usando el servidor MCP (Claude)
 
-El servidor MCP reutiliza la sesión creada por `penca login` (o `PENCA_TOKEN`). Agregalo a
-Claude Desktop / Claude Code:
+Hay dos formas; el detalle completo está en [`packages/mcp/README.md`](packages/mcp).
+
+**Hosted (recomendada, cero instalación).** El servidor ya corre en
+`https://1930.dev/penca-ovacion/mcp` (Streamable HTTP). Agregá la URL como conector remoto en
+Claude, o:
+
+```bash
+claude mcp add --transport http penca-ovacion https://1930.dev/penca-ovacion/mcp
+```
+
+El ingreso pasa **dentro del MCP**, sin credenciales en el server: la tool `penca_login` te
+manda un magic link y `penca_login_complete` lo completa para esa sesión.
+
+**Local (stdio).** Corré el paquete publicado con `npx`; reutiliza la sesión de `penca login`
+(o `PENCA_TOKEN`):
 
 ```json
 {
   "mcpServers": {
-    "penca": {
-      "command": "penca-mcp"
-    }
+    "penca": { "command": "npx", "args": ["-y", "@1930dev/penca-ovacion-mcp"] }
   }
 }
 ```
@@ -123,7 +134,8 @@ Claude Desktop / Claude Code:
 Herramientas: `penca_whoami`, `penca_update_profile`, `penca_tournaments`, `penca_matches`,
 `penca_match_statistics`, `penca_ovi_prediction`, `penca_predict`, `penca_digest`,
 `penca_groups_mine`, `penca_groups_public`, `penca_ranking`, `penca_wall_read`,
-`penca_wall_post`, `penca_polls`, `penca_articles`, `penca_predictions`.
+`penca_wall_post`, `penca_polls`, `penca_articles`, `penca_predictions` (más `penca_login` y
+`penca_login_complete` en el modo hosted).
 
 ## Desarrollo
 
@@ -136,9 +148,10 @@ pnpm lint         # biome
 ```
 
 El repo es un workspace de [pnpm](https://pnpm.io). `npm`/`yarn` también funcionan, pero se
-recomienda pnpm. Los nombres de los paquetes no tienen scope, así que se pueden publicar sin
-una organización de npm; cambialos a un scope (ej. `@vos/penca-ovacion-*`) en cada
-`package.json` si lo preferís.
+recomienda pnpm. El servidor MCP se publica en npm como
+[`@1930dev/penca-ovacion-mcp`](https://www.npmjs.com/package/@1930dev/penca-ovacion-mcp)
+(tag `mcp-v*` → CI lo publica); el SDK y la CLI todavía no están publicados, por ahora se
+usan desde el clon.
 
 ## Extender a otros LLMs
 
