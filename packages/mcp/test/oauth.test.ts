@@ -37,7 +37,7 @@ function fakeFetch(): typeof fetch {
     if (url.endsWith('/api/v1/auth/send-magic-link')) {
       return jsonResponse({ sent: true, userExists: true });
     }
-    if (url.endsWith('/api/v1/auth/magic-login')) {
+    if (url.endsWith('/api/v1/auth/magic-login') || url.endsWith('/api/v1/auth/login')) {
       return jsonResponse({
         accessToken: 'penca-access',
         refreshToken: 'penca-refresh',
@@ -120,7 +120,14 @@ describe('discovery + registration', () => {
 });
 
 describe('authorization code flow with PKCE', () => {
-  async function fullFlow(deps: OAuthDeps, clientId: string, challenge: string) {
+  // `completion` is what the user enters at the magic step: a link/token by
+  // default, or a short OTP code.
+  async function fullFlow(
+    deps: OAuthDeps,
+    clientId: string,
+    challenge: string,
+    completion = 'https://penca/magic?token=abc',
+  ) {
     const start = await call(deps, 'GET', '/oauth/authorize', {
       query: {
         response_type: 'code',
@@ -141,13 +148,32 @@ describe('authorization code flow with PKCE', () => {
     expect(email?.status).toBe(200);
 
     const complete = await call(deps, 'POST', '/oauth/authorize/complete', {
-      body: form({ login_id: loginId, token: 'https://penca/magic?token=abc' }),
+      body: form({ login_id: loginId, token: completion }),
     });
     expect(complete?.status).toBe(302);
     const location = complete?.headers?.location ?? '';
     expect(new URL(location).searchParams.get('state')).toBe('xyz');
     return codeFrom(location);
   }
+
+  it('completes the login with an emailed OTP code (not just a link)', async () => {
+    const deps = makeDeps();
+    const clientId = await registerClient(deps);
+    const { verifier, challenge } = pkce();
+    const code = await fullFlow(deps, clientId, challenge, '1a2b3c'); // OTP
+    expect(code).not.toBe('');
+    // the issued code exchanges for a real token → the OTP login succeeded
+    const tok = await call(deps, 'POST', '/oauth/token', {
+      body: form({
+        grant_type: 'authorization_code',
+        code,
+        code_verifier: verifier,
+        client_id: clientId,
+      }),
+    });
+    expect(tok?.status).toBe(200);
+    expect((tok?.body as { access_token?: string }).access_token).toBeTruthy();
+  });
 
   it('exchanges code + verifier for an audience-bound access token and refresh token', async () => {
     const deps = makeDeps();

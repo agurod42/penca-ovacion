@@ -101,6 +101,16 @@ export function extractMagicToken(input: string): string {
   return value;
 }
 
+/**
+ * Heuristic to tell a typed email OTP from a magic-link URL or its long token:
+ * OTPs are short alphanumeric codes (observed: 6 hex chars), whereas magic
+ * tokens are 64+ hex chars and links are URLs. Lets callers route a pasted
+ * value to {@link PencaClient.otpLogin} vs {@link PencaClient.magicLogin}.
+ */
+export function looksLikeOtp(input: string): boolean {
+  return /^[0-9a-z]{4,8}$/i.test(input.trim());
+}
+
 function extractUser(body: unknown): CurrentUser | undefined {
   if (!body || typeof body !== 'object') return undefined;
   const root = body as Record<string, unknown>;
@@ -224,6 +234,16 @@ export class PencaClient implements AuthHook {
       body: { token },
     });
     return this.persistLogin(body);
+  }
+
+  /**
+   * Complete an email sign-in with the one-time code (OTP) from the magic-link
+   * email. The same email {@link sendMagicLink} triggers contains both a link
+   * and a short code; the code is the password for the `email` provider. This
+   * is the typed-code alternative to {@link magicLogin}. Persists the tokens.
+   */
+  otpLogin(email: string, code: string): Promise<LoginResult> {
+    return this.login({ provider: 'email', email, password: code.trim() });
   }
 
   /** Authenticate with email + password and persist the resulting tokens. */

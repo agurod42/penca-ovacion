@@ -1,6 +1,6 @@
 import { isCancel, password as passwordPrompt, text } from '@clack/prompts';
 import type { Command } from 'commander';
-import { type LoginResult, type PencaClient, decodeJwt } from 'penca-ovacion-sdk';
+import { type LoginResult, type PencaClient, decodeJwt, looksLikeOtp } from 'penca-ovacion-sdk';
 import { requireAuth, run } from '../context.js';
 import { c, emit, fail, heading, info, success } from '../output.js';
 import { setup } from './helpers.js';
@@ -25,14 +25,22 @@ export function registerAuth(program: Command): void {
     .description('Authenticate (passwordless magic link by default)')
     .option('-e, --email <email>', 'account email (otherwise prompted)')
     .option('--password [password]', 'use email + password instead of a magic link')
-    .option('--token <token>', 'complete a magic-link login non-interactively (token or full link)')
+    .option(
+      '--token <token>',
+      'complete a login non-interactively (the email code, a magic-link token, or full link)',
+    )
     .action(async (_o, cmd: Command) => {
       const { client, opts } = setup(cmd);
       const local = cmd.opts() as { email?: string; password?: string | boolean; token?: string };
       await run(async () => {
-        // Non-interactive magic-link completion.
+        // Non-interactive completion: a short code (needs --email) is the email
+        // OTP; anything else is a magic-link token / URL.
         if (local.token) {
-          await finishLogin(client, await client.magicLogin(local.token), opts.json);
+          const result =
+            looksLikeOtp(local.token) && local.email
+              ? await client.otpLogin(local.email, local.token)
+              : await client.magicLogin(local.token);
+          await finishLogin(client, result, opts.json);
           return;
         }
 
@@ -58,22 +66,30 @@ export function registerAuth(program: Command): void {
           return;
         }
 
-        // Default: passwordless magic link.
+        // Default: passwordless. The email carries both a short code and a link.
         const res = await client.sendMagicLink(email);
-        if (!res.sent) fail('Could not send a magic link for that email.');
+        if (!res.sent) fail('Could not send a sign-in email for that address.');
         info(
-          `✉  Magic link sent to ${c.bold(email)}. Open the email and copy the link (or its token).`,
+          `✉  Sign-in email sent to ${c.bold(email)}. Enter the code from it, or paste the magic link.`,
         );
         if (opts.json) {
           emit(
-            { sent: true, userExists: res.userExists, next: 'run `penca login --token <token>`' },
+            {
+              sent: true,
+              userExists: res.userExists,
+              next: 'run `penca login --email <email> --token <code>` (or paste the link/token)',
+            },
             () => {},
           );
           return;
         }
-        const pasted = await text({ message: 'Paste the magic link or token from the email' });
-        if (isCancel(pasted)) fail('Cancelled');
-        await finishLogin(client, await client.magicLogin(String(pasted)), opts.json);
+        const answer = await text({ message: 'Enter the code, or paste the magic link' });
+        if (isCancel(answer)) fail('Cancelled');
+        const pasted = String(answer).trim();
+        const result = looksLikeOtp(pasted)
+          ? await client.otpLogin(email, pasted)
+          : await client.magicLogin(pasted);
+        await finishLogin(client, result, opts.json);
       });
     });
 

@@ -6,6 +6,7 @@ export {
   DEFAULT_USER_AGENT,
   extractTokens,
   extractMagicToken,
+  looksLikeOtp,
 } from './client.js';
 export type { PencaClientOptions, LoginInput, LoginResult, SessionStatus } from './client.js';
 

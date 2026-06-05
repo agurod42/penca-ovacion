@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import { MemoryTokenStore, PencaClient } from 'penca-ovacion-sdk';
+import { MemoryTokenStore, PencaClient, looksLikeOtp } from 'penca-ovacion-sdk';
 import { z } from 'zod';
 import * as analytics from './analytics.js';
 import { codecFromEnv } from './crypto.js';
@@ -148,16 +148,21 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 
 /** Register per-session sign-in tools bound to this session's client. */
 function registerAuthTools(server: McpServer, client: PencaClient): void {
+  // Remembered between the two sign-in steps so the emailed code (OTP) can be
+  // completed without re-supplying the address.
+  let lastEmail = '';
+
   server.tool(
     'penca_login',
-    'Step 1 of sign-in: send a passwordless magic-link email to the given address. The email contains a one-time link; pass it (or its token) to penca_login_complete.',
+    'Step 1 of sign-in: email a one-time code (and magic link) to the given address. Then call penca_login_complete with either the 6-character code from the email or the link.',
     { email: z.string().email().describe('email address of the Penca account') },
     async ({ email }) => {
       try {
         const r = await client.sendMagicLink(email);
+        lastEmail = email;
         return json({
           ...r,
-          next: 'Check your email, then call penca_login_complete with the magic link (or its token).',
+          next: 'Check your email, then call penca_login_complete with the 6-character code (or the magic link).',
         });
       } catch (err) {
         return toolError(err);
@@ -166,11 +171,27 @@ function registerAuthTools(server: McpServer, client: PencaClient): void {
   );
   server.tool(
     'penca_login_complete',
-    'Step 2 of sign-in: complete the passwordless login with the magic-link URL (or the one-time token from it). Authenticates the current MCP session.',
-    { tokenOrLink: z.string().min(1).describe('the magic-link URL from the email, or its token') },
-    async ({ tokenOrLink }) => {
+    'Step 2 of sign-in: complete the login with the 6-character code from the email, or the magic-link URL / its token. Authenticates the current MCP session.',
+    {
+      codeOrLink: z
+        .string()
+        .min(1)
+        .describe('the 6-character code from the email, or the magic-link URL / token'),
+      email: z
+        .string()
+        .email()
+        .optional()
+        .describe('account email (only needed for the code if penca_login was not called first)'),
+    },
+    async ({ codeOrLink, email }) => {
       try {
-        await client.magicLogin(tokenOrLink);
+        const value = codeOrLink.trim();
+        const addr = email ?? lastEmail;
+        if (looksLikeOtp(value) && addr) {
+          await client.otpLogin(addr, value);
+        } else {
+          await client.magicLogin(value);
+        }
         const me = await client.me();
         return json({ loggedIn: true, account: me });
       } catch (err) {

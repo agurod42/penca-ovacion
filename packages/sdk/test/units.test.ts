@@ -10,6 +10,7 @@ import {
   extractMagicToken,
   extractTokens,
   isExpired,
+  looksLikeOtp,
   paginate,
 } from '../src/index.js';
 import { fakeJwt } from './fixtures.js';
@@ -46,6 +47,19 @@ describe('extractMagicToken', () => {
   });
   it('extracts a hex token embedded in a path', () => {
     expect(extractMagicToken(`https://penca.example/auth/${hex}`)).toBe(hex);
+  });
+});
+
+describe('looksLikeOtp', () => {
+  it('accepts short alphanumeric codes', () => {
+    expect(looksLikeOtp('443885')).toBe(true);
+    expect(looksLikeOtp('1a2b3c')).toBe(true);
+    expect(looksLikeOtp('  19e192  ')).toBe(true); // trimmed
+  });
+  it('rejects magic tokens and links', () => {
+    expect(looksLikeOtp('a'.repeat(128))).toBe(false);
+    expect(looksLikeOtp('https://penca.example/magic?token=abc')).toBe(false);
+    expect(looksLikeOtp('')).toBe(false);
   });
 });
 

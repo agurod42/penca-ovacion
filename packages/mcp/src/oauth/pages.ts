@@ -62,17 +62,18 @@ export function emailPage(opts: { loginId: string; error?: string }): string {
   );
 }
 
-/** Step 2: paste the magic link / token from the email. */
+/** Step 2: enter the code from the email, or paste the magic link. */
 export function magicPage(opts: { loginId: string; email: string; error?: string }): string {
   return layout(
-    'Confirmá el enlace',
+    'Confirmá tu correo',
     `<h1>Revisá tu correo</h1>
-     <p>Enviamos un enlace a <strong>${esc(opts.email)}</strong>. Abrilo y pegá acá el enlace (o su token).</p>
+     <p>Te enviamos un mensaje a <strong>${esc(opts.email)}</strong>. Ingresá el <strong>código</strong> que aparece, o pegá el enlace.</p>
      ${errorBanner(opts.error)}
      <form method="post" action="/oauth/authorize/complete">
        <input type="hidden" name="login_id" value="${esc(opts.loginId)}">
-       <label for="token">Enlace mágico o token</label>
-       <input id="token" name="token" type="text" required autofocus placeholder="https://…  o  el token">
+       <label for="token">Código o enlace mágico</label>
+       <input id="token" name="token" type="text" required autofocus autocomplete="one-time-code"
+              placeholder="el código (p. ej. 1a2b3c)  o  https://…">
        <button type="submit">Confirmar e iniciar sesión</button>
      </form>`,
   );

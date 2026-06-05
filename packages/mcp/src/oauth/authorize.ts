@@ -1,3 +1,4 @@
+import { looksLikeOtp } from 'penca-ovacion-sdk';
 import { SqliteTokenStore } from '../token-store.js';
 import { emailPage, errorPage, magicPage } from './pages.js';
 import { setIdentityEmail } from './store.js';
@@ -82,11 +83,17 @@ export async function handleAuthorizeComplete(
 
   const email = pending.email ?? '';
   const token = (form.token ?? '').trim();
-  if (!token) return html(200, magicPage({ loginId, email, error: 'Pegá el enlace o el token.' }));
+  if (!token)
+    return html(200, magicPage({ loginId, email, error: 'Ingresá el código o pegá el enlace.' }));
 
   try {
     const penca = deps.createPencaClient();
-    const { tokens, user } = await penca.magicLogin(token);
+    // A short code is the email OTP (login password); anything else is a magic
+    // link / token.
+    const { tokens, user } =
+      looksLikeOtp(token) && email
+        ? await penca.otpLogin(email, token)
+        : await penca.magicLogin(token);
     const subject = user?.id ?? (await penca.me()).id;
 
     // Persist the Penca tokens for this subject (refresh encrypted via codec).
@@ -106,7 +113,11 @@ export async function handleAuthorizeComplete(
   } catch {
     return html(
       200,
-      magicPage({ loginId, email, error: 'El enlace no es válido o expiró. Probá de nuevo.' }),
+      magicPage({
+        loginId,
+        email,
+        error: 'El código o enlace no es válido o expiró. Probá de nuevo.',
+      }),
     );
   }
 }

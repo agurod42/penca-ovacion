@@ -165,6 +165,22 @@ describe('auth', () => {
     expect(await tokens.load()).toEqual({ accessToken: 'a', refreshToken: 'b' });
   });
 
+  it('otpLogin posts the email code as the password and persists tokens', async () => {
+    const tokens = new MemoryTokenStore();
+    const { fetch, requests } = mockFetch([
+      { status: 201, json: { accessToken: 'a', refreshToken: 'b' } },
+    ]);
+    const c = new PencaClient({ fetch, tokens, baseUrl: 'https://api.example.test' });
+    const res = await c.otpLogin('test@example.test', ' 1a2b3c ');
+    expect(requests[0]!.url).toMatch(/\/auth\/login$/);
+    expect(requests[0]!.body).toEqual({
+      provider: 'email',
+      email: 'test@example.test',
+      password: '1a2b3c', // trimmed
+    });
+    expect(res.tokens).toEqual({ accessToken: 'a', refreshToken: 'b' });
+  });
+
   it('sends a magic link', async () => {
     const { fetch, requests } = mockFetch([
       { status: 201, json: { sent: true, userExists: true } },
