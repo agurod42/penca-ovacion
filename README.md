@@ -20,9 +20,9 @@
 <p align="center">
   <a href="#usando-el-servidor-mcp-claude-cursor-vs-code"><img src="https://img.shields.io/badge/Claude-Cómo_agregarlo-D97757?logo=anthropic&logoColor=white" alt="Add to Claude" height="32"></a>
   &nbsp;
-  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovLzE5MzAuZGV2L3BlbmNhLW92YWNpb24vbWNwIn0="><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
+  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovL3BlbmNhLW92YWNpb24uMTkzMC5kZXYvbWNwIn0="><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
   &nbsp;
-  <a href="https://insiders.vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2F1930.dev%2Fpenca-ovacion%2Fmcp%22%7D"><img src="https://img.shields.io/badge/VS_Code-Add_MCP-007ACC?logo=visualstudiocode&logoColor=white" alt="Add to VS Code" height="32"></a>
+  <a href="https://insiders.vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fpenca-ovacion.1930.dev%2Fmcp%22%7D"><img src="https://img.shields.io/badge/VS_Code-Add_MCP-007ACC?logo=visualstudiocode&logoColor=white" alt="Add to VS Code" height="32"></a>
 </p>
 
 > [!WARNING]
@@ -51,7 +51,7 @@ penca --help
 ### Entrá y jugá
 
 ```bash
-penca login                       # sin contraseña: te manda un magic link, lo pegás de vuelta
+penca login                       # sin contraseña: te llega un email; pegás el código o el magic link
 penca whoami
 penca profile --nickname "bielsista"
 penca tournaments
@@ -71,13 +71,14 @@ y agentes), además de `--no-color`, `--base-url <url>` y `--debug`.
 
 ### Autenticación y guardado de tokens
 
-El ingreso principal por email es **sin contraseña**: `penca login` te manda un magic link
-por correo; pegás el link (o su token) en el prompt para completar el ingreso. Para
-automatizar, partilo en dos pasos:
+El ingreso principal por email es **sin contraseña**: `penca login` te manda un correo que
+trae **tanto un código corto (OTP) como un magic link**; pegás cualquiera de los dos en el
+prompt y la CLI detecta automáticamente cuál es. Para automatizar, partilo en dos pasos:
 
 ```bash
-penca login --email vos@example.com          # manda el link (te dice el próximo paso)
-penca login --token "<link-o-token>"         # completa el ingreso
+penca login --email vos@example.com          # manda el email (te dice el próximo paso)
+penca login --email vos@example.com --token "<código>"   # con el OTP del correo
+penca login --token "<link-o-token>"         # o con el magic link / su token
 ```
 
 También se soporta email + contraseña (`penca login --password`) y proveedores sociales
@@ -123,22 +124,25 @@ Hay dos formas; el detalle completo está en [`packages/mcp/README.md`](packages
 
 ### Hosted (recomendada, cero instalación)
 
-El servidor ya corre en `https://1930.dev/penca-ovacion/mcp` (Streamable HTTP). El ingreso
-pasa **dentro del MCP**, sin credenciales en el server: la tool `penca_login` te manda un
-magic link y `penca_login_complete` lo completa para esa sesión.
+El servidor ya corre en `https://penca-ovacion.1930.dev/mcp` (Streamable HTTP). El ingreso es
+**OAuth 2.1 en el navegador**: tu cliente abre una ventana de login del propio servidor (email +
+magic link), lo pegás una vez y la **sesión queda guardada** — no hace falta re-loguearse en cada
+conversación, y el cliente maneja el token de forma nativa. Para cerrar sesión, llamá la tool
+`penca_logout`. (Como fallback, si el cliente no hace OAuth, el login también funciona dentro del
+MCP vía las tools `penca_login` / `penca_login_complete` para esa sesión.)
 
 **Claude Code** — pegá el comando (o agregá la URL como conector remoto en Claude Desktop / claude.ai):
 
 ```bash
-claude mcp add --transport http penca-ovacion https://1930.dev/penca-ovacion/mcp
+claude mcp add --transport http penca-ovacion https://penca-ovacion.1930.dev/mcp
 ```
 
 **Cursor / VS Code** — un clic:
 
 <p>
-  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovLzE5MzAuZGV2L3BlbmNhLW92YWNpb24vbWNwIn0="><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
+  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovL3BlbmNhLW92YWNpb24uMTkzMC5kZXYvbWNwIn0="><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
   &nbsp;
-  <a href="https://insiders.vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2F1930.dev%2Fpenca-ovacion%2Fmcp%22%7D"><img src="https://img.shields.io/badge/VS_Code-Add_MCP-007ACC?logo=visualstudiocode&logoColor=white" alt="Add to VS Code" height="32"></a>
+  <a href="https://insiders.vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fpenca-ovacion.1930.dev%2Fmcp%22%7D"><img src="https://img.shields.io/badge/VS_Code-Add_MCP-007ACC?logo=visualstudiocode&logoColor=white" alt="Add to VS Code" height="32"></a>
 </p>
 
 ### Local (stdio)
@@ -172,8 +176,8 @@ O a mano en cualquier cliente MCP por config:
 Herramientas: `penca_whoami`, `penca_update_profile`, `penca_tournaments`, `penca_matches`,
 `penca_match_statistics`, `penca_ovi_prediction`, `penca_predict`, `penca_digest`,
 `penca_groups_mine`, `penca_groups_public`, `penca_ranking`, `penca_wall_read`,
-`penca_wall_post`, `penca_polls`, `penca_articles`, `penca_predictions` (más `penca_login` y
-`penca_login_complete` en el modo hosted).
+`penca_wall_post`, `penca_polls`, `penca_articles`, `penca_predictions` (más `penca_login`,
+`penca_login_complete` y `penca_logout` para gestionar la sesión).
 
 ## Desarrollo
 
