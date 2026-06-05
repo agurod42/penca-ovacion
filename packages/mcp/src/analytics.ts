@@ -19,8 +19,13 @@
  * "chatgpt.com" / "penca" / "other"); for an authenticated subject it is named
  * after the user's email and carries it as a profile trait. The email is
  * supplied by an injected `resolveProfile` callback so this module never imports
- * the DB. Sessions are intentionally absent: OpenPanel only sessionises
- * browser/client events, and MCP traffic is server-side.
+ * the DB.
+ *
+ * Sessions: OpenPanel only sessionises events whose User-Agent parses to a real
+ * browser. MCP traffic is server-side, so on each `initialize` we emit a
+ * `screen_view` carrying a browser UA (see SESSION_ANCHOR_UA) — that anchors a
+ * session / unique visitor / pageview. Custom events (tool calls, lifecycle)
+ * keep the caller's real UA and stay server-side.
  *
  * This is a port of the Realmint MCP `analytics.py`, extended with per-user
  * identity for the OAuth path.
@@ -32,6 +37,16 @@ import { createHash } from 'node:crypto';
 const OPENPANEL_SDK_NAME = 'penca-ovacion-mcp';
 const OPENPANEL_SDK_VERSION = '1';
 const TRACK_TIMEOUT_MS = 2000;
+
+// OpenPanel decides client-vs-server SOLELY by parsing the User-Agent: a UA it
+// can't resolve to a real browser/OS (empty, or `name/version` like our SDK UA)
+// is tagged `isServer` and never creates a session. MCP traffic is server-side,
+// so to make the `screen_view` anchor register as a session / unique visitor /
+// pageview we send this browser UA on that one event. Verified empirically:
+// browser UA → session created, our SDK UA → no session.
+const SESSION_ANCHOR_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 let clientId = '';
 let clientSecret = '';
@@ -185,7 +200,7 @@ export function trackFor(
     userAgent: '',
     mcpSessionId: '',
   };
-  void send(event, { ...properties }, ctx).catch(() => {});
+  void send(event, { ...properties }, { ctx }).catch(() => {});
 }
 
 /**
@@ -208,22 +223,33 @@ function identifyTraits(ctx: RequestCtx | undefined, cohort: string): Record<str
   return { firstName, properties };
 }
 
+interface SendOpts {
+  /** Attribution context when running outside the request's ALS (trackFor). */
+  ctx?: RequestCtx;
+  /** Override the User-Agent sent to OpenPanel (session anchor — see SESSION_ANCHOR_UA). */
+  userAgent?: string;
+}
+
 async function send(
   event: string,
   properties: Record<string, unknown>,
-  ctxOverride?: RequestCtx,
+  opts: SendOpts = {},
 ): Promise<void> {
   if (!enabled) return;
 
-  const ctx = ctxOverride ?? currentCtx();
+  const ctx = opts.ctx ?? currentCtx();
   const extraHeaders: Record<string, string> = {};
   let profileId: string | undefined;
   if (ctx) {
     // Authenticated → group by the real Penca subject; else anonymous device id.
     profileId = ctx.subject || deriveDeviceId(ctx.origin, ctx.clientIp);
     if (ctx.clientIp) extraHeaders['x-client-ip'] = ctx.clientIp;
-    if (ctx.userAgent) extraHeaders['user-agent'] = ctx.userAgent;
   }
+  // OpenPanel classifies an event as client (sessionised) vs server purely by
+  // parsing this User-Agent. opts.userAgent lets the screen_view anchor force a
+  // browser UA so it creates a session; everything else forwards the caller's.
+  const userAgent = opts.userAgent ?? ctx?.userAgent;
+  if (userAgent) extraHeaders['user-agent'] = userAgent;
 
   // First event from a profile this process: name it (cohort, or the user) so the
   // dashboard shows a label instead of a bare id. Server events only group when a
@@ -338,10 +364,13 @@ export function recordJsonRpc(body: unknown, headers: Record<string, string>): v
     });
     // `screen_view` is OpenPanel's page-view event: it is what builds sessions,
     // unique visitors and pageviews (custom events alone never do). __path /
-    // __title are the reserved keys OpenPanel reads for the page.
-    track('screen_view', {
-      __path: `/mcp/${cohort}`,
-      __title: `MCP — ${clientName}`,
-    });
+    // __title are the reserved keys OpenPanel reads for the page. It must carry
+    // a browser UA (SESSION_ANCHOR_UA) or OpenPanel tags it server-side and skips
+    // the session. Runs inside the request ALS, so profileId/IP come from ctx.
+    void send(
+      'screen_view',
+      { __path: `/mcp/${cohort}`, __title: `MCP — ${clientName}` },
+      { userAgent: SESSION_ANCHOR_UA },
+    ).catch(() => {});
   }
 }

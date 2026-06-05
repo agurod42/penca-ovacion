@@ -95,7 +95,9 @@ Se habilita seteando `OPENPANEL_CLIENT_ID` y `OPENPANEL_CLIENT_SECRET` (ver
 buckets) y los del ciclo de vida `login_success` / `signup` / `logout`. En cada `initialize`
 también se emite un `screen_view` sintético (`/mcp/<cliente>`) para que OpenPanel registre la
 conexión como sesión / visitante único / pageview — el MCP es server-side y no tiene
-pantallas reales, así que mapeamos un `initialize` a una "pantalla".
+pantallas reales, así que mapeamos un `initialize` a una "pantalla". OpenPanel decide
+cliente-vs-servidor parseando el `User-Agent`, así que ese `screen_view` viaja con un UA de
+navegador (es el único evento que lo hace; el resto conserva el UA real del cliente).
 
 **Identidad.** Cuando la request está autenticada por OAuth, los eventos se agrupan por el
 `subject` real (id de usuario de Penca) y el perfil se identifica con el email del usuario,

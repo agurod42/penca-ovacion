@@ -58,9 +58,18 @@ describe('analytics identity model', () => {
   // track()/trackFor() are fire-and-forget; give the detached send() time to run.
   const flush = () => new Promise((r) => setTimeout(r, 20));
 
-  function envelopes(): Array<Record<string, any>> {
-    return fetchMock.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string));
+  // Pair each request's parsed body with the headers it was sent with, so tests
+  // can assert per-event attribution (profileId) and the User-Agent override.
+  function calls(): Array<{ body: Record<string, any>; headers: Record<string, string> }> {
+    return fetchMock.mock.calls.map((c) => {
+      const init = c[1] as RequestInit;
+      return {
+        body: JSON.parse(init.body as string),
+        headers: (init.headers ?? {}) as Record<string, string>,
+      };
+    });
   }
+  const envelopes = () => calls().map((c) => c.body);
   const tracks = () => envelopes().filter((e) => e.type === 'track');
   const identifies = () => envelopes().filter((e) => e.type === 'identify');
 
@@ -110,13 +119,13 @@ describe('analytics identity model', () => {
     expect(id?.payload.firstName).toBe('penca:user-noEmail');
   });
 
-  it('emits a screen_view on initialize so OpenPanel builds a session', async () => {
+  it('emits a screen_view on initialize with a browser UA so OpenPanel sessionises it', async () => {
     analytics.init();
     await analytics.runWithContext(
       {
         origin: 'https://claude.ai',
         clientIp: '1.2.3.4',
-        userAgent: '',
+        userAgent: 'penca-ovacion-mcp/1', // server-style UA on the request
         mcpSessionId: '',
         subject: 'user-init',
       },
@@ -127,10 +136,16 @@ describe('analytics identity model', () => {
         ),
     );
     await flush();
-    const sv = tracks().find((e) => e.payload.name === 'screen_view');
+    const sv = calls().find((c) => c.body.payload?.name === 'screen_view');
     expect(sv).toBeDefined();
-    expect(sv?.payload.profileId).toBe('user-init');
-    expect(sv?.payload.properties.__path).toBe('/mcp/claude.ai');
+    expect(sv?.body.payload.profileId).toBe('user-init');
+    expect(sv?.body.payload.properties.__path).toBe('/mcp/claude.ai');
+    // The anchor must override the server UA with a browser UA, or OpenPanel
+    // classifies it server-side and skips the session.
+    expect(sv?.headers['user-agent']).toMatch(/Mozilla\/5\.0.*Chrome/);
+    // A normal custom event keeps the caller's real (server) UA.
+    const tool = calls().find((c) => c.body.payload?.name === 'mcp_session_started');
+    expect(tool?.headers['user-agent']).toBe('penca-ovacion-mcp/1');
   });
 
   it('identifies a subject only once per process', async () => {
