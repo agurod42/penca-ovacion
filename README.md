@@ -20,7 +20,7 @@
 <p align="center">
   <a href="#usando-el-servidor-mcp-claude-cursor-vs-code"><img src="https://img.shields.io/badge/Claude-Cómo_agregarlo-D97757?logo=anthropic&logoColor=white" alt="Add to Claude" height="32"></a>
   &nbsp;
-  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovL3BlbmNhLW92YWNpb24uMTkzMC5kZXYvbWNwIn0="><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
+  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovL3BlbmNhLW92YWNpb24uMTkzMC5kZXYvbWNwIn0="><img src="https://img.shields.io/badge/Add_to-Cursor-000000?logo=cursor&logoColor=white" alt="Add to Cursor" height="32"></a>
   &nbsp;
   <a href="https://insiders.vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fpenca-ovacion.1930.dev%2Fmcp%22%7D"><img src="https://img.shields.io/badge/VS_Code-Add_MCP-007ACC?logo=visualstudiocode&logoColor=white" alt="Add to VS Code" height="32"></a>
 </p>
@@ -140,7 +140,7 @@ claude mcp add --transport http penca-ovacion https://penca-ovacion.1930.dev/mcp
 **Cursor / VS Code** — un clic:
 
 <p>
-  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovL3BlbmNhLW92YWNpb24uMTkzMC5kZXYvbWNwIn0="><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
+  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovL3BlbmNhLW92YWNpb24uMTkzMC5kZXYvbWNwIn0="><img src="https://img.shields.io/badge/Add_to-Cursor-000000?logo=cursor&logoColor=white" alt="Add to Cursor" height="32"></a>
   &nbsp;
   <a href="https://insiders.vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fpenca-ovacion.1930.dev%2Fmcp%22%7D"><img src="https://img.shields.io/badge/VS_Code-Add_MCP-007ACC?logo=visualstudiocode&logoColor=white" alt="Add to VS Code" height="32"></a>
 </p>
@@ -158,7 +158,7 @@ claude mcp add penca-ovacion -- npx -y @1930dev/penca-ovacion-mcp
 **Cursor / VS Code** — un clic:
 
 <p>
-  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkAxOTMwZGV2L3BlbmNhLW92YWNpb24tbWNwIl19"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
+  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkAxOTMwZGV2L3BlbmNhLW92YWNpb24tbWNwIl19"><img src="https://img.shields.io/badge/Add_to-Cursor-000000?logo=cursor&logoColor=white" alt="Add to Cursor" height="32"></a>
   &nbsp;
   <a href="https://insiders.vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%401930dev%2Fpenca-ovacion-mcp%22%5D%7D"><img src="https://img.shields.io/badge/VS_Code-Add_MCP-007ACC?logo=visualstudiocode&logoColor=white" alt="Add to VS Code" height="32"></a>
 </p>
