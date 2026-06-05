@@ -1,17 +1,29 @@
-# Penca Ovación toolkit
+<h1 align="center">⚽ Penca Ovación toolkit</h1>
 
-Toolkit no oficial para **Penca Antel Ovación** — el juego de pronósticos de fútbol más
-popular de Uruguay. Usá la penca desde la terminal, desde tus
-scripts o desde un agente LLM: un **SDK** tipado, una **CLI** prolija y un **servidor MCP**.
+<p align="center">
+  Toolkit no oficial para <b>Penca Antel Ovación</b> — el juego de pronósticos de fútbol más
+  popular de Uruguay.<br/>
+  Jugá la penca desde la terminal, tus scripts o un agente LLM:
+  un <b>SDK</b> tipado, una <b>CLI</b> prolija y un <b>servidor MCP</b>.
+</p>
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  penca-ovacion-sdk   cliente tipado · auth · guardado de tokens │
-└───────┬─────────────────────────┬──────────────────────┬─────┘
-        │                         │                      │
-   penca-ovacion            penca-ovacion-mcp        skills/claude
-   (CLI · `penca`)          (MCP · `penca-mcp`)      (skill de Claude)
-```
+<p align="center">
+  <a href="https://www.npmjs.com/package/@1930dev/penca-ovacion-mcp"><img src="https://img.shields.io/npm/v/@1930dev/penca-ovacion-mcp?label=mcp&color=cb3837&logo=npm" alt="npm"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT"></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-ready-6E56CF" alt="MCP ready"></a>
+  <img src="https://img.shields.io/badge/Made%20in-Uruguay%20%F0%9F%87%BA%F0%9F%87%BE-75AADB" alt="Made in Uruguay">
+</p>
+
+<p align="center">
+  <b>Instalá el MCP en un clic</b> (servidor hosted, cero instalación):
+</p>
+<p align="center">
+  <a href="#usando-el-servidor-mcp-claude-cursor-vs-code"><img src="https://img.shields.io/badge/Claude-Cómo_agregarlo-D97757?logo=anthropic&logoColor=white" alt="Add to Claude" height="32"></a>
+  &nbsp;
+  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovLzE5MzAuZGV2L3BlbmNhLW92YWNpb24vbWNwIn0="><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
+  &nbsp;
+  <a href="https://insiders.vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2F1930.dev%2Fpenca-ovacion%2Fmcp%22%7D"><img src="https://img.shields.io/badge/VS_Code-Add_MCP-007ACC?logo=visualstudiocode&logoColor=white" alt="Add to VS Code" height="32"></a>
+</p>
 
 > [!WARNING]
 > **No oficial.** Este proyecto no está afiliado ni respaldado por Ovación, Antel ni
@@ -105,23 +117,49 @@ import { paginate, collect } from 'penca-ovacion-sdk';
 const allPosts = await collect(paginate((page) => penca.wall.posts({ page, limit: 20 }), { limit: 20 }));
 ```
 
-## Usando el servidor MCP (Claude)
+## Usando el servidor MCP (Claude, Cursor, VS Code)
 
 Hay dos formas; el detalle completo está en [`packages/mcp/README.md`](packages/mcp).
 
-**Hosted (recomendada, cero instalación).** El servidor ya corre en
-`https://1930.dev/penca-ovacion/mcp` (Streamable HTTP). Agregá la URL como conector remoto en
-Claude, o:
+### Hosted (recomendada, cero instalación)
+
+El servidor ya corre en `https://1930.dev/penca-ovacion/mcp` (Streamable HTTP). El ingreso
+pasa **dentro del MCP**, sin credenciales en el server: la tool `penca_login` te manda un
+magic link y `penca_login_complete` lo completa para esa sesión.
+
+**Claude Code** — pegá el comando (o agregá la URL como conector remoto en Claude Desktop / claude.ai):
 
 ```bash
 claude mcp add --transport http penca-ovacion https://1930.dev/penca-ovacion/mcp
 ```
 
-El ingreso pasa **dentro del MCP**, sin credenciales en el server: la tool `penca_login` te
-manda un magic link y `penca_login_complete` lo completa para esa sesión.
+**Cursor / VS Code** — un clic:
 
-**Local (stdio).** Corré el paquete publicado con `npx`; reutiliza la sesión de `penca login`
-(o `PENCA_TOKEN`):
+<p>
+  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJ1cmwiOiJodHRwczovLzE5MzAuZGV2L3BlbmNhLW92YWNpb24vbWNwIn0="><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
+  &nbsp;
+  <a href="https://insiders.vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2F1930.dev%2Fpenca-ovacion%2Fmcp%22%7D"><img src="https://img.shields.io/badge/VS_Code-Add_MCP-007ACC?logo=visualstudiocode&logoColor=white" alt="Add to VS Code" height="32"></a>
+</p>
+
+### Local (stdio)
+
+Corré el paquete publicado con `npx`; reutiliza la sesión de `penca login` (o `PENCA_TOKEN`).
+
+**Claude Code**:
+
+```bash
+claude mcp add penca-ovacion -- npx -y @1930dev/penca-ovacion-mcp
+```
+
+**Cursor / VS Code** — un clic:
+
+<p>
+  <a href="https://cursor.com/install-mcp?name=penca-ovacion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkAxOTMwZGV2L3BlbmNhLW92YWNpb24tbWNwIl19"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
+  &nbsp;
+  <a href="https://insiders.vscode.dev/redirect?url=vscode:mcp/install?%7B%22name%22%3A%22penca-ovacion%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%401930dev%2Fpenca-ovacion-mcp%22%5D%7D"><img src="https://img.shields.io/badge/VS_Code-Add_MCP-007ACC?logo=visualstudiocode&logoColor=white" alt="Add to VS Code" height="32"></a>
+</p>
+
+O a mano en cualquier cliente MCP por config:
 
 ```json
 {
