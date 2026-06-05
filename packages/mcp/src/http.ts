@@ -15,7 +15,7 @@ import { ClientStore } from './oauth/clients.js';
 import { resolveOAuthConfig } from './oauth/config.js';
 import { type AuthOutcome, type GateConfig, resolveAuth, wwwAuthenticate } from './oauth/gate.js';
 import { handleOAuth } from './oauth/router.js';
-import { AuthCodeStore, PendingLoginStore, SessionStore } from './oauth/store.js';
+import { AuthCodeStore, PendingLoginStore, SessionStore, getIdentity } from './oauth/store.js';
 import type { OAuthDeps } from './oauth/types.js';
 import { createServer } from './server.js';
 import { SqliteTokenStore } from './token-store.js';
@@ -193,6 +193,16 @@ function registerAuthTools(server: McpServer, client: PencaClient): void {
           await client.magicLogin(value);
         }
         const me = await client.me();
+        // Legacy path uses in-memory tokens and never persists penca_identities,
+        // so new-vs-returning is unknowable here (is_new: null).
+        if (me?.id) {
+          analytics.trackFor(
+            me.id,
+            'login_success',
+            { method: 'magic_link', is_new: null },
+            analytics.ambientAttribution(),
+          );
+        }
         return json({ loggedIn: true, account: me });
       } catch (err) {
         return toolError(err);
@@ -214,17 +224,27 @@ function headerRecord(req: IncomingMessage): Record<string, string> {
   return out;
 }
 
-/** Capture inbound-request attribution for fire-and-forget analytics. */
-function requestCtx(req: IncomingMessage): analytics.RequestCtx {
+/** Best-effort client IP, honoring X-Forwarded-For from the reverse proxy. */
+function clientIpOf(req: IncomingMessage): string {
   const forwarded = (req.headers['x-forwarded-for'] as string | undefined) ?? '';
-  const clientIp = forwarded
-    ? (forwarded.split(',')[0]?.trim() ?? '')
-    : (req.socket.remoteAddress ?? '');
+  return forwarded ? (forwarded.split(',')[0]?.trim() ?? '') : (req.socket.remoteAddress ?? '');
+}
+
+/** Origin + IP attribution for lifecycle events emitted outside the ALS context. */
+function attributionOf(req: IncomingMessage): { origin: string; clientIp: string } {
+  return { origin: (req.headers.origin as string | undefined) ?? '', clientIp: clientIpOf(req) };
+}
+
+/** Capture inbound-request attribution for fire-and-forget analytics. */
+function requestCtx(req: IncomingMessage, auth: AuthOutcome): analytics.RequestCtx {
   return {
     origin: (req.headers.origin as string | undefined) ?? '',
-    clientIp,
+    clientIp: clientIpOf(req),
     userAgent: (req.headers['user-agent'] as string | undefined) ?? '',
     mcpSessionId: (req.headers['mcp-session-id'] as string | undefined) ?? '',
+    // Authenticated requests carry the Penca subject so analytics groups events
+    // under the real user; open/legacy requests stay anonymous.
+    subject: auth.kind === 'oauth' ? auth.subject : undefined,
   };
 }
 
@@ -313,7 +333,13 @@ const httpServer = createHttpServer(async (req, res) => {
       url.pathname.startsWith('/oauth/') || url.pathname.startsWith('/.well-known/oauth');
     if (isOAuthRoute) {
       const rawBody = req.method === 'POST' ? await readRawBody(req) : undefined;
-      const result = await handleOAuth(req.method ?? 'GET', url, rawBody, oauthDeps);
+      const result = await handleOAuth(
+        req.method ?? 'GET',
+        url,
+        rawBody,
+        oauthDeps,
+        attributionOf(req),
+      );
       if (result) {
         const isJson = !result.headers?.['content-type'];
         res.writeHead(result.status, {
@@ -339,7 +365,7 @@ const httpServer = createHttpServer(async (req, res) => {
 
     // Run the MCP dispatch inside the request's analytics context so tool
     // handlers can attribute events to a stable anonymous profile.
-    const ctx = requestCtx(req);
+    const ctx = requestCtx(req, auth);
     if (req.method === 'POST') {
       return await analytics.runWithContext(ctx, () => handlePost(req, res, auth));
     }
@@ -355,8 +381,10 @@ const httpServer = createHttpServer(async (req, res) => {
 });
 
 // Arm OpenPanel (no-op unless OPENPANEL_CLIENT_ID/SECRET are set). HTTP only;
-// the stdio entrypoint never calls this, so stdio runs stay silent.
-analytics.init();
+// the stdio entrypoint never calls this, so stdio runs stay silent. The profile
+// resolver backs the email trait (gated by OPENPANEL_IDENTIFY_PII) without
+// pulling the DB into the analytics module.
+analytics.init({ resolveProfile: (subject) => getIdentity(db, subject) });
 
 httpServer.listen(PORT, () => {
   console.error(`penca-ovacion MCP (Streamable HTTP, multi-user) listening on :${PORT}${MCP_PATH}`);

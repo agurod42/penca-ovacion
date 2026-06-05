@@ -91,10 +91,19 @@ El despliegue *hosted* (Streamable HTTP) puede reportar uso agregado a
 
 Se habilita seteando `OPENPANEL_CLIENT_ID` y `OPENPANEL_CLIENT_SECRET` (ver
 [`.env.example`](./.env.example)). Eventos emitidos: `mcp_server_started`,
-`mcp_session_started` (en `initialize`) y `mcp_tool_called` (con tool, estado y duración en
-buckets). No se guarda PII: el `profileId` es un hash anónimo y estable de `Origin + IP`, la
-IP nunca se persiste en claro. `GET /analytics/stats` expone contadores de envío para
-verificar que los eventos están llegando.
+`mcp_session_started` (en `initialize`), `mcp_tool_called` (con tool, estado y duración en
+buckets) y los del ciclo de vida `login_success` / `signup` / `logout`. En cada `initialize`
+también se emite un `screen_view` sintético (`/mcp/<cliente>`) para que OpenPanel registre la
+conexión como sesión / visitante único / pageview — el MCP es server-side y no tiene
+pantallas reales, así que mapeamos un `initialize` a una "pantalla".
+
+**Identidad.** Cuando la request está autenticada por OAuth, los eventos se agrupan por el
+`subject` real (id de usuario de Penca) y el perfil se identifica con el email del usuario,
+así el panel muestra comportamiento por usuario y altas nuevas vs. recurrentes. El tráfico
+anónimo/legacy sigue cayendo en un `profileId` que es un hash estable de `Origin + IP` (la IP
+nunca se persiste en claro). Como esto manda emails a OpenPanel, usalo contra un OpenPanel
+**self-hosted**. `GET /analytics/stats` expone contadores de envío para verificar que los
+eventos están llegando.
 
 Mirá el [README del repositorio](https://github.com/agurod42/penca-ovacion#readme) para el
 toolkit completo (SDK + CLI). **No oficial** — sin afiliación con Ovación/Antel/FutbolX.

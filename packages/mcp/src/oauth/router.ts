@@ -1,4 +1,6 @@
+import * as analytics from '../analytics.js';
 import {
+  type Attribution,
   handleAuthorizeComplete,
   handleAuthorizeEmail,
   handleAuthorizeStart,
@@ -68,9 +70,20 @@ function registerClient(body: unknown, clients: ClientStore): OAuthResult {
 }
 
 /** Token revocation (RFC 7009). Always responds 200, even for unknown tokens. */
-function revokeToken(form: Record<string, string>, deps: OAuthDeps): OAuthResult {
+function revokeToken(
+  form: Record<string, string>,
+  deps: OAuthDeps,
+  attribution: Attribution,
+): OAuthResult {
   const token = form.token;
-  if (token) deps.sessions.delete(token); // we track refresh tokens; access JWTs are stateless
+  if (token) {
+    // Look up the subject before deleting so the logout event can be attributed.
+    const session = deps.sessions.get(token);
+    deps.sessions.delete(token); // we track refresh tokens; access JWTs are stateless
+    if (session) {
+      analytics.trackFor(session.subject, 'logout', { via: 'oauth_revoke' }, attribution);
+    }
+  }
   return { status: 200, body: {} };
 }
 
@@ -84,6 +97,7 @@ export async function handleOAuth(
   url: URL,
   rawBody: string | undefined,
   deps: OAuthDeps,
+  attribution: Attribution = {},
 ): Promise<OAuthResult | null> {
   const path = url.pathname;
 
@@ -106,9 +120,9 @@ export async function handleOAuth(
     if (path === '/oauth/register') return registerClient(parseJson(rawBody), deps.clients);
     if (path === '/oauth/authorize/email') return handleAuthorizeEmail(parseForm(rawBody), deps);
     if (path === '/oauth/authorize/complete')
-      return handleAuthorizeComplete(parseForm(rawBody), deps);
+      return handleAuthorizeComplete(parseForm(rawBody), deps, attribution);
     if (path === '/oauth/token') return handleToken(parseForm(rawBody), deps);
-    if (path === '/oauth/revoke') return revokeToken(parseForm(rawBody), deps);
+    if (path === '/oauth/revoke') return revokeToken(parseForm(rawBody), deps, attribution);
   }
 
   return null;

@@ -234,3 +234,16 @@ export class PendingLoginStore {
 export function setIdentityEmail(db: Db, subject: string, email: string): void {
   db.prepare('UPDATE penca_identities SET email = ? WHERE subject = ?').run(email, subject);
 }
+
+/** Read the profile traits stored for a subject (today just the email). */
+export function getIdentity(db: Db, subject: string): { email: string | null } | undefined {
+  const row = db.prepare('SELECT email FROM penca_identities WHERE subject = ?').get(subject) as
+    | { email: string | null }
+    | undefined;
+  return row ? { email: row.email } : undefined;
+}
+
+/** Whether an identity row already exists for a subject (returning vs new user). */
+export function identityExists(db: Db, subject: string): boolean {
+  return db.prepare('SELECT 1 FROM penca_identities WHERE subject = ?').get(subject) !== undefined;
+}

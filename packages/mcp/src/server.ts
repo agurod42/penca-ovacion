@@ -94,6 +94,9 @@ export function createServer(client: PencaClient = buildClient()): McpServer {
     {},
     guard('penca_logout', async () => {
       await client.logout();
+      // Lifecycle event. track() attributes to the ambient profile: the Penca
+      // subject for OAuth sessions, the anonymous device otherwise.
+      analytics.track('logout', { via: 'penca_logout' });
       return json({ loggedOut: true });
     }),
   );

@@ -9,15 +9,21 @@
  * set, `track()` becomes a no-op. Stdio runs never call `init()`, so the HTTP
  * path is never exercised and analytics stays silent.
  *
- * Identity model: MCP has no end-user. We derive a stable anonymous
- * `profileId` from `SHA256(Origin + X-Forwarded-For)[:16]` and send it as a
- * top-level payload field so OpenPanel groups a caller's events into one
- * anonymous profile (named after its cohort — "claude.ai" / "chatgpt.com" /
- * "penca" / "other" — via a one-time `identify`) without ever storing the
- * caller IP in cleartext. Sessions are intentionally absent: OpenPanel only
- * sessionises browser/client events, and MCP traffic is server-side.
+ * Identity model: when a request is OAuth-authenticated we know the Penca
+ * `subject` (user id) and use it directly as the `profileId`, so OpenPanel
+ * groups all of a user's events under their real account across sessions and
+ * devices. Otherwise we fall back to a stable anonymous `profileId` derived
+ * from `SHA256(Origin + X-Forwarded-For)[:16]`, so unauthenticated/legacy
+ * traffic stays anonymous and the caller IP is never stored in cleartext. The
+ * one-time `identify` names the profile after its cohort ("claude.ai" /
+ * "chatgpt.com" / "penca" / "other"); for an authenticated subject it is named
+ * after the user's email and carries it as a profile trait. The email is
+ * supplied by an injected `resolveProfile` callback so this module never imports
+ * the DB. Sessions are intentionally absent: OpenPanel only sessionises
+ * browser/client events, and MCP traffic is server-side.
  *
- * This is a faithful port of the Realmint MCP `analytics.py`.
+ * This is a port of the Realmint MCP `analytics.py`, extended with per-user
+ * identity for the OAuth path.
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -31,6 +37,11 @@ let clientId = '';
 let clientSecret = '';
 let apiUrl = '';
 let enabled = false;
+
+/** Resolve profile traits for an authenticated subject. Injected at init() so
+ *  this module never imports the DB. Returns undefined when unknown. */
+type ProfileResolver = (subject: string) => { email?: string | null } | undefined;
+let resolveProfile: ProfileResolver | undefined;
 
 // Set from OPENPANEL_DEBUG at init(); when true, every successful send is also
 // logged to stderr (verbose). Failures are always logged regardless.
@@ -58,6 +69,8 @@ export interface RequestCtx {
   clientIp: string;
   userAgent: string;
   mcpSessionId: string;
+  /** Penca subject (user id) when the request is OAuth-authenticated. */
+  subject?: string;
 }
 
 // AsyncLocalStorage is the Node equivalent of Python's contextvars: it carries
@@ -75,6 +88,12 @@ function currentCtx(): RequestCtx | undefined {
   return als.getStore();
 }
 
+/** Origin/IP of the in-flight request, for {@link trackFor} from a tool handler. */
+export function ambientAttribution(): { origin?: string; clientIp?: string } {
+  const ctx = currentCtx();
+  return ctx ? { origin: ctx.origin, clientIp: ctx.clientIp } : {};
+}
+
 export function isEnabled(): boolean {
   return enabled;
 }
@@ -84,14 +103,24 @@ export function stats(): Record<string, unknown> {
   return { enabled, sent_ok: sentOk, sent_failed: sentFailed, api_url: apiUrl };
 }
 
+/** Options for {@link init}. */
+export interface InitOptions {
+  /** Resolve email/profile traits for an authenticated subject (DB-backed). */
+  resolveProfile?: ProfileResolver;
+}
+
+const isTrue = (v: string | undefined): boolean =>
+  ['1', 'true', 'yes'].includes((v ?? '').trim().toLowerCase());
+
 /** Read OpenPanel creds from env and arm the client if both are present. */
-export function init(): void {
+export function init(opts: InitOptions = {}): void {
   clientId = (process.env.OPENPANEL_CLIENT_ID ?? '').trim();
   clientSecret = (process.env.OPENPANEL_CLIENT_SECRET ?? '').trim();
   apiUrl = (process.env.OPENPANEL_API_URL ?? 'https://api.openpanel.dev')
     .trim()
     .replace(/\/+$/, '');
-  debug = ['1', 'true', 'yes'].includes((process.env.OPENPANEL_DEBUG ?? '').trim().toLowerCase());
+  debug = isTrue(process.env.OPENPANEL_DEBUG);
+  resolveProfile = opts.resolveProfile;
 
   if (!clientId || !clientSecret) {
     log('OpenPanel disabled (OPENPANEL_CLIENT_ID/SECRET not set).');
@@ -127,6 +156,8 @@ export function bucketDuration(ms: number): string {
 
 /**
  * Fire-and-forget. Returns immediately; never raises. Safe from sync contexts.
+ * Attributes to the ambient request context (subject if authenticated, else the
+ * anonymous device profile).
  */
 export function track(event: string, properties: Record<string, unknown>): void {
   if (!enabled) return;
@@ -134,31 +165,76 @@ export function track(event: string, properties: Record<string, unknown>): void 
   void send(event, { ...properties }).catch(() => {});
 }
 
-async function send(event: string, properties: Record<string, unknown>): Promise<void> {
+/**
+ * Like {@link track}, but for code paths that run OUTSIDE the request's
+ * AsyncLocalStorage context (the OAuth completion + revoke handlers): the
+ * subject and origin/IP are passed explicitly instead of read from the ambient
+ * context. Used for the login/signup/logout lifecycle events.
+ */
+export function trackFor(
+  subject: string,
+  event: string,
+  properties: Record<string, unknown>,
+  attribution: { origin?: string; clientIp?: string } = {},
+): void {
+  if (!enabled) return;
+  const ctx: RequestCtx = {
+    subject,
+    origin: attribution.origin ?? '',
+    clientIp: attribution.clientIp ?? '',
+    userAgent: '',
+    mcpSessionId: '',
+  };
+  void send(event, { ...properties }, ctx).catch(() => {});
+}
+
+/**
+ * Build the `identify` traits for a profile. An authenticated subject is named
+ * after the user's email (falling back to `penca:<subject>` when the email is
+ * unknown) and carries the email as a trait so the dashboard shows real users.
+ */
+function identifyTraits(ctx: RequestCtx | undefined, cohort: string): Record<string, unknown> {
+  const properties: Record<string, unknown> = { cohort, via: 'mcp' };
+  let firstName = cohort;
+  if (ctx?.subject) {
+    properties.subject = ctx.subject;
+    firstName = `penca:${ctx.subject}`;
+    const email = resolveProfile?.(ctx.subject)?.email ?? undefined;
+    if (email) {
+      firstName = email;
+      properties.email = email;
+    }
+  }
+  return { firstName, properties };
+}
+
+async function send(
+  event: string,
+  properties: Record<string, unknown>,
+  ctxOverride?: RequestCtx,
+): Promise<void> {
   if (!enabled) return;
 
-  const ctx = currentCtx();
+  const ctx = ctxOverride ?? currentCtx();
   const extraHeaders: Record<string, string> = {};
   let profileId: string | undefined;
   if (ctx) {
-    profileId = deriveDeviceId(ctx.origin, ctx.clientIp);
+    // Authenticated → group by the real Penca subject; else anonymous device id.
+    profileId = ctx.subject || deriveDeviceId(ctx.origin, ctx.clientIp);
     if (ctx.clientIp) extraHeaders['x-client-ip'] = ctx.clientIp;
     if (ctx.userAgent) extraHeaders['user-agent'] = ctx.userAgent;
   }
 
-  // First event from a profile this process: name it after its cohort so the
-  // dashboard shows "claude.ai" / "penca" / ... instead of a bare hash. Server
-  // events only group when a top-level profileId is present, so without this
-  // (and the profileId below) OpenPanel drops them into no profile at all.
+  // First event from a profile this process: name it (cohort, or the user) so the
+  // dashboard shows a label instead of a bare id. Server events only group when a
+  // top-level profileId is present, so without this (and the profileId below)
+  // OpenPanel drops them into no profile at all.
   if (profileId !== undefined && !identified.has(profileId)) {
     if (identified.size >= IDENTIFIED_CAP) identified.clear();
     identified.add(profileId);
     const cohort = classifyClient(ctx ? ctx.origin : '');
     await post(
-      {
-        type: 'identify',
-        payload: { profileId, firstName: cohort, properties: { cohort, via: 'mcp' } },
-      },
+      { type: 'identify', payload: { profileId, ...identifyTraits(ctx, cohort) } },
       extraHeaders,
       'identify',
     );
@@ -237,7 +313,10 @@ export function trackTool(tool: string, status: 'ok' | 'error', elapsedMs: numbe
 /**
  * Peek the JSON-RPC method(s) of a POST /mcp body (best-effort, never throws).
  * On `initialize` — the first message of every new MCP connection — emit
- * `mcp_session_started` so OpenPanel can count sessions.
+ * `mcp_session_started` (a custom event) plus a synthetic `screen_view` so
+ * OpenPanel's session model registers the connection as a session / unique
+ * visitor / pageview. MCP is server-side and has no real screens, so we map one
+ * `initialize` to one screen named after the client cohort.
  */
 export function recordJsonRpc(body: unknown, headers: Record<string, string>): void {
   if (!body) return;
@@ -248,12 +327,21 @@ export function recordJsonRpc(body: unknown, headers: Record<string, string>): v
     if (method !== 'initialize') continue;
     const params = ((m as Record<string, unknown>).params ?? {}) as Record<string, unknown>;
     const clientInfo = (params.clientInfo ?? {}) as Record<string, unknown>;
+    const cohort = classifyClient(headers.origin ?? '');
+    const clientName = (clientInfo.name as string) || cohort;
     track('mcp_session_started', {
       transport: 'http',
-      client: classifyClient(headers.origin ?? ''),
+      client: cohort,
       protocol_version: params.protocolVersion ?? '',
       client_name: clientInfo.name ?? '',
       client_version: clientInfo.version ?? '',
+    });
+    // `screen_view` is OpenPanel's page-view event: it is what builds sessions,
+    // unique visitors and pageviews (custom events alone never do). __path /
+    // __title are the reserved keys OpenPanel reads for the page.
+    track('screen_view', {
+      __path: `/mcp/${cohort}`,
+      __title: `MCP — ${clientName}`,
     });
   }
 }

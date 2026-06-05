@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as analytics from '../src/analytics.js';
 
 describe('analytics (OpenPanel port)', () => {
@@ -34,5 +34,110 @@ describe('analytics (OpenPanel port)', () => {
     expect(analytics.bucketDuration(250)).toBe('<500');
     expect(analytics.bucketDuration(1500)).toBe('<2000');
     expect(analytics.bucketDuration(9000)).toBe('>=2000');
+  });
+});
+
+describe('analytics identity model', () => {
+  const origEnv = { ...process.env };
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    process.env.OPENPANEL_CLIENT_ID = 'cid';
+    process.env.OPENPANEL_CLIENT_SECRET = 'csec';
+    process.env.OPENPANEL_API_URL = 'https://op.test';
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    process.env = { ...origEnv };
+    analytics.init(); // disable again so module state doesn't leak
+  });
+
+  // track()/trackFor() are fire-and-forget; give the detached send() time to run.
+  const flush = () => new Promise((r) => setTimeout(r, 20));
+
+  function envelopes(): Array<Record<string, any>> {
+    return fetchMock.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string));
+  }
+  const tracks = () => envelopes().filter((e) => e.type === 'track');
+  const identifies = () => envelopes().filter((e) => e.type === 'identify');
+
+  it('groups events by the Penca subject when authenticated', async () => {
+    analytics.init();
+    await analytics.runWithContext(
+      {
+        origin: 'https://claude.ai',
+        clientIp: '1.2.3.4',
+        userAgent: '',
+        mcpSessionId: '',
+        subject: 'user-1',
+      },
+      async () => analytics.track('mcp_tool_called', { tool: 'x' }),
+    );
+    await flush();
+    const t = tracks();
+    expect(t.at(-1)?.payload.profileId).toBe('user-1');
+  });
+
+  it('falls back to the anonymous device id without a subject', async () => {
+    analytics.init();
+    const expected = analytics.deriveDeviceId('https://claude.ai', '9.9.9.9');
+    await analytics.runWithContext(
+      { origin: 'https://claude.ai', clientIp: '9.9.9.9', userAgent: '', mcpSessionId: '' },
+      async () => analytics.track('mcp_tool_called', { tool: 'x' }),
+    );
+    await flush();
+    expect(tracks()[0]?.payload.profileId).toBe(expected);
+  });
+
+  it('identifies an authenticated profile with the email trait', async () => {
+    analytics.init({ resolveProfile: () => ({ email: 'persona@example.test' }) });
+    analytics.trackFor('user-email', 'login_success', { method: 'oauth' });
+    await flush();
+    const id = identifies().find((e) => e.payload.profileId === 'user-email');
+    expect(id?.payload.properties.email).toBe('persona@example.test');
+    expect(id?.payload.firstName).toBe('persona@example.test');
+  });
+
+  it('falls back to penca:<subject> when the email is unknown', async () => {
+    analytics.init({ resolveProfile: () => undefined });
+    analytics.trackFor('user-noEmail', 'login_success', { method: 'oauth' });
+    await flush();
+    const id = identifies().find((e) => e.payload.profileId === 'user-noEmail');
+    expect(id?.payload.properties.email).toBeUndefined();
+    expect(id?.payload.firstName).toBe('penca:user-noEmail');
+  });
+
+  it('emits a screen_view on initialize so OpenPanel builds a session', async () => {
+    analytics.init();
+    await analytics.runWithContext(
+      {
+        origin: 'https://claude.ai',
+        clientIp: '1.2.3.4',
+        userAgent: '',
+        mcpSessionId: '',
+        subject: 'user-init',
+      },
+      async () =>
+        analytics.recordJsonRpc(
+          { method: 'initialize', params: { clientInfo: { name: 'Claude' } } },
+          { origin: 'https://claude.ai' },
+        ),
+    );
+    await flush();
+    const sv = tracks().find((e) => e.payload.name === 'screen_view');
+    expect(sv).toBeDefined();
+    expect(sv?.payload.profileId).toBe('user-init');
+    expect(sv?.payload.properties.__path).toBe('/mcp/claude.ai');
+  });
+
+  it('identifies a subject only once per process', async () => {
+    analytics.init();
+    analytics.trackFor('user-once', 'login_success', { method: 'oauth' });
+    analytics.trackFor('user-once', 'logout', { via: 'penca_logout' });
+    await flush();
+    expect(identifies().filter((e) => e.payload.profileId === 'user-once')).toHaveLength(1);
   });
 });

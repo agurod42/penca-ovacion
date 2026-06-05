@@ -1,8 +1,15 @@
 import { looksLikeOtp } from 'penca-ovacion-sdk';
+import * as analytics from '../analytics.js';
 import { SqliteTokenStore } from '../token-store.js';
 import { emailPage, errorPage, magicPage } from './pages.js';
-import { setIdentityEmail } from './store.js';
+import { identityExists, setIdentityEmail } from './store.js';
 import { type OAuthDeps, type OAuthResult, appendQuery, html, redirect } from './types.js';
+
+/** Origin + IP of the sign-in request, for attributing lifecycle events. */
+export interface Attribution {
+  origin?: string;
+  clientIp?: string;
+}
 
 /**
  * GET /oauth/authorize — validate the request and render the email step.
@@ -76,6 +83,7 @@ export async function handleAuthorizeEmail(
 export async function handleAuthorizeComplete(
   form: Record<string, string>,
   deps: OAuthDeps,
+  attribution: Attribution = {},
 ): Promise<OAuthResult> {
   const loginId = form.login_id ?? '';
   const pending = deps.pending.get(loginId);
@@ -96,9 +104,18 @@ export async function handleAuthorizeComplete(
         : await penca.magicLogin(token);
     const subject = user?.id ?? (await penca.me()).id;
 
+    // Capture new-vs-returning BEFORE the upsert creates the identity row.
+    const isNew = !identityExists(deps.db, subject);
+
     // Persist the Penca tokens for this subject (refresh encrypted via codec).
     await new SqliteTokenStore(deps.db, subject, deps.codec).save(tokens);
     if (user?.email) setIdentityEmail(deps.db, subject, user.email);
+
+    // Lifecycle events: always a login, plus a signup the first time we see this
+    // subject. Fired after the email is persisted so the profile resolver can
+    // attach it as a trait (when OPENPANEL_IDENTIFY_PII is enabled).
+    analytics.trackFor(subject, 'login_success', { method: 'oauth', is_new: isNew }, attribution);
+    if (isNew) analytics.trackFor(subject, 'signup', { method: 'oauth' }, attribution);
 
     const code = deps.codes.issue({
       subject,
