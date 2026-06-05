@@ -152,14 +152,31 @@ export function deriveDeviceId(origin: string, clientIp: string): string {
   return createHash('sha256').update(seed, 'utf8').digest('hex').slice(0, 16);
 }
 
-/** Bucket the Origin into a small set for cohort filtering. */
-export function classifyClient(origin: string): string {
-  if (!origin) return 'unknown';
+/**
+ * Bucket a request into a small cohort. The MCP `clientInfo.name` (sent in
+ * `initialize`) is the reliable signal — real clients often send no `Origin`
+ * header at all — so it takes priority; the Origin is only a fallback.
+ */
+export function classifyClient(origin: string, clientName?: string): string {
+  const name = (clientName ?? '').toLowerCase();
+  if (name) {
+    if (name.includes('claude') || name.includes('anthropic')) return 'claude.ai';
+    if (name.includes('chatgpt') || name.includes('openai')) return 'chatgpt.com';
+    if (name.includes('cursor')) return 'cursor';
+    if (name.includes('windsurf')) return 'windsurf';
+    if (name.includes('cline')) return 'cline';
+    if (name.includes('visual studio') || name.includes('vscode')) return 'vscode';
+    if (name.includes('penca')) return 'penca';
+  }
   const lo = origin.toLowerCase();
-  if (lo.includes('claude.ai') || lo.includes('anthropic')) return 'claude.ai';
-  if (lo.includes('chatgpt.com') || lo.includes('openai')) return 'chatgpt.com';
-  if (lo.includes('1930.dev') || lo.includes('penca') || lo.includes('ovacion')) return 'penca';
-  return 'other';
+  if (lo) {
+    if (lo.includes('claude.ai') || lo.includes('anthropic')) return 'claude.ai';
+    if (lo.includes('chatgpt.com') || lo.includes('openai')) return 'chatgpt.com';
+    if (lo.includes('1930.dev') || lo.includes('penca') || lo.includes('ovacion')) return 'penca';
+    return 'other';
+  }
+  // No origin and an unrecognised (but present) client name → still "other".
+  return name ? 'other' : 'unknown';
 }
 
 export function bucketDuration(ms: number): string {
@@ -174,10 +191,14 @@ export function bucketDuration(ms: number): string {
  * Attributes to the ambient request context (subject if authenticated, else the
  * anonymous device profile).
  */
-export function track(event: string, properties: Record<string, unknown>): void {
+export function track(
+  event: string,
+  properties: Record<string, unknown>,
+  opts: SendOpts = {},
+): void {
   if (!enabled) return;
   // Detach: don't await, and swallow anything so analytics can't break a call.
-  void send(event, { ...properties }).catch(() => {});
+  void send(event, { ...properties }, opts).catch(() => {});
 }
 
 /**
@@ -228,6 +249,8 @@ interface SendOpts {
   ctx?: RequestCtx;
   /** Override the User-Agent sent to OpenPanel (session anchor — see SESSION_ANCHOR_UA). */
   userAgent?: string;
+  /** Pre-resolved cohort for the profile `identify` (e.g. from clientInfo.name). */
+  cohort?: string;
 }
 
 async function send(
@@ -258,7 +281,7 @@ async function send(
   if (profileId !== undefined && !identified.has(profileId)) {
     if (identified.size >= IDENTIFIED_CAP) identified.clear();
     identified.add(profileId);
-    const cohort = classifyClient(ctx ? ctx.origin : '');
+    const cohort = opts.cohort ?? classifyClient(ctx ? ctx.origin : '');
     await post(
       { type: 'identify', payload: { profileId, ...identifyTraits(ctx, cohort) } },
       extraHeaders,
@@ -353,15 +376,22 @@ export function recordJsonRpc(body: unknown, headers: Record<string, string>): v
     if (method !== 'initialize') continue;
     const params = ((m as Record<string, unknown>).params ?? {}) as Record<string, unknown>;
     const clientInfo = (params.clientInfo ?? {}) as Record<string, unknown>;
-    const cohort = classifyClient(headers.origin ?? '');
+    // Cohort from clientInfo.name (reliable) before Origin (often absent). The
+    // first emission below carries it so the profile `identify` labels the user
+    // by real client, and the screen_view path becomes /mcp/<client>.
+    const cohort = classifyClient(headers.origin ?? '', clientInfo.name as string | undefined);
     const clientName = (clientInfo.name as string) || cohort;
-    track('mcp_session_started', {
-      transport: 'http',
-      client: cohort,
-      protocol_version: params.protocolVersion ?? '',
-      client_name: clientInfo.name ?? '',
-      client_version: clientInfo.version ?? '',
-    });
+    track(
+      'mcp_session_started',
+      {
+        transport: 'http',
+        client: cohort,
+        protocol_version: params.protocolVersion ?? '',
+        client_name: clientInfo.name ?? '',
+        client_version: clientInfo.version ?? '',
+      },
+      { cohort },
+    );
     // `screen_view` is OpenPanel's page-view event: it is what builds sessions,
     // unique visitors and pageviews (custom events alone never do). __path /
     // __title are the reserved keys OpenPanel reads for the page. It must carry
@@ -370,7 +400,7 @@ export function recordJsonRpc(body: unknown, headers: Record<string, string>): v
     void send(
       'screen_view',
       { __path: `/mcp/${cohort}`, __title: `MCP — ${clientName}` },
-      { userAgent: SESSION_ANCHOR_UA },
+      { cohort, userAgent: SESSION_ANCHOR_UA },
     ).catch(() => {});
   }
 }

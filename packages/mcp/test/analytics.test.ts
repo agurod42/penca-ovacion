@@ -20,6 +20,19 @@ describe('analytics (OpenPanel port)', () => {
     expect(analytics.classifyClient('')).toBe('unknown');
   });
 
+  it('prioritises the MCP clientInfo.name over Origin', () => {
+    // Real clients often send no Origin; the client name is the reliable signal.
+    expect(analytics.classifyClient('', 'Claude')).toBe('claude.ai');
+    expect(analytics.classifyClient('', 'claude-ai')).toBe('claude.ai');
+    expect(analytics.classifyClient('', 'ChatGPT')).toBe('chatgpt.com');
+    expect(analytics.classifyClient('', 'Cursor')).toBe('cursor');
+    expect(analytics.classifyClient('', 'Visual Studio Code')).toBe('vscode');
+    // Name wins over a conflicting origin.
+    expect(analytics.classifyClient('https://claude.ai', 'Cursor')).toBe('cursor');
+    // Unknown but present name → other (not unknown).
+    expect(analytics.classifyClient('', 'SomeMcpClient')).toBe('other');
+  });
+
   it('derives a stable 16-hex anonymous device id', () => {
     const a = analytics.deriveDeviceId('https://claude.ai', '1.2.3.4');
     const b = analytics.deriveDeviceId('https://claude.ai', '1.2.3.4');
@@ -146,6 +159,24 @@ describe('analytics identity model', () => {
     // A normal custom event keeps the caller's real (server) UA.
     const tool = calls().find((c) => c.body.payload?.name === 'mcp_session_started');
     expect(tool?.headers['user-agent']).toBe('penca-ovacion-mcp/1');
+  });
+
+  it('labels an anonymous profile by clientInfo.name even without an Origin header', async () => {
+    analytics.init();
+    await analytics.runWithContext(
+      { origin: '', clientIp: '5.5.5.5', userAgent: 'node', mcpSessionId: '' },
+      async () =>
+        analytics.recordJsonRpc(
+          { method: 'initialize', params: { clientInfo: { name: 'Claude' } } },
+          {}, // no Origin header — the real-traffic case
+        ),
+    );
+    await flush();
+    const sv = calls().find((c) => c.body.payload?.name === 'screen_view');
+    expect(sv?.body.payload.properties.__path).toBe('/mcp/claude.ai');
+    const id = identifies().find((e) => e.payload.profileId === sv?.body.payload.profileId);
+    expect(id?.payload.firstName).toBe('claude.ai');
+    expect(id?.payload.properties.cohort).toBe('claude.ai');
   });
 
   it('identifies a subject only once per process', async () => {
