@@ -1,105 +1,104 @@
 # CLAUDE.md — Penca Ovación toolkit
 
-Guía para agentes que trabajan en este repo. Estas reglas **mandan** sobre el comportamiento
-por defecto. Si algo acá contradice lo que ibas a hacer, ganan estas reglas.
+Guide for agents working in this repo. These rules **override** default behavior.
+If anything here contradicts what you were going to do, these rules win.
 
-## Qué es
+## What it is
 
-Toolkit **no oficial** para Penca Antel Ovación. Habla con la **API privada** de la app móvil,
-obtenida por ingeniería inversa. Monorepo pnpm con tres paquetes encadenados:
+**Unofficial** toolkit for Penca Antel Ovación. Talks to the **private API** of the mobile app,
+obtained through reverse engineering. pnpm monorepo with three chained packages:
 
 ```
 packages/sdk  →  packages/cli  →  packages/mcp
 penca-ovacion-sdk   penca-ovacion (bin: penca)   @1930dev/penca-ovacion-mcp (bin: penca-mcp)
 ```
 
-Más `skills/` (wrappers por proveedor de LLM, hoy un Agent Skill de Anthropic).
+Plus `skills/` (per-LLM-provider wrappers, currently one Anthropic Agent Skill).
 
-## Arquitectura — reglas duras
+## Architecture — hard rules
 
-- **El SDK es la única capa que habla con la API.** La CLI y el MCP **nunca** hacen `fetch`
-  a la API ni reimplementan endpoints: todo pasa por `penca-ovacion-sdk`. Lo mismo vale para
-  cualquier skill o integración nueva.
-- **Dirección de dependencias:** `sdk ← cli ← mcp`. Nunca al revés. El SDK no importa nada de
-  CLI ni de MCP y mantiene sus dependencias de runtime al mínimo (keytar es opcional/lazy).
-- **Endpoint nuevo de la API** → agregalo como método tipado en el resource correspondiente de
-  `packages/sdk/src/resources/`, exportá los tipos en `packages/sdk/src/index.ts`, y recién
-  ahí consumilo desde CLI/MCP. Para algo puntual o aún no modelado, usá el escape hatch
-  `client.request()` en vez de hardcodear un fetch.
-- **MCP:** cada tool se registra en `packages/mcp/src/server.ts` con schema **zod** y delega en
-  el SDK. El MCP es **read-only por defecto**: las tools de escritura (`penca_predict`,
-  `penca_wall_post`, `penca_update_profile`, etc.) deben confirmarse con la persona antes de
-  ejecutarse — eso está en las instrucciones del server, no lo rompas.
-- **CLI:** comandos con `commander` en `packages/cli/src/commands/`. **Todo comando acepta
-  `--json`** (salida procesable) además de los flags globales `--no-color`, `--base-url`,
-  `--debug`. Si agregás un comando, mantené esa convención.
+- **The SDK is the only layer that talks to the API.** The CLI and MCP **never** `fetch`
+  the API directly or reimplement endpoints: everything goes through `penca-ovacion-sdk`. The same
+  applies to any new skill or integration.
+- **Dependency direction:** `sdk ← cli ← mcp`. Never the other way around. The SDK does not import
+  anything from CLI or MCP and keeps its runtime dependencies minimal (keytar is optional/lazy).
+- **New API endpoint** → add it as a typed method in the corresponding resource under
+  `packages/sdk/src/resources/`, export the types in `packages/sdk/src/index.ts`, and only then
+  consume it from CLI/MCP. For something one-off or not yet modelled, use the escape hatch
+  `client.request()` instead of hardcoding a fetch.
+- **MCP:** each tool is registered in `packages/mcp/src/server.ts` with a **zod** schema and
+  delegates to the SDK. The MCP is **read-only by default**: write tools (`penca_predict`,
+  `penca_wall_post`, `penca_update_profile`, etc.) must be confirmed with the user before
+  executing — that is in the server instructions; do not break it.
+- **CLI:** commands with `commander` in `packages/cli/src/commands/`. **Every command accepts
+  `--json`** (machine-readable output) in addition to the global flags `--no-color`, `--base-url`,
+  `--debug`. If you add a command, keep that convention.
 
-## Convenciones de código
+## Code conventions
 
-- **ESM puro.** Imports relativos llevan extensión explícita `.js` (aunque el archivo sea
-  `.ts`). Módulos de Node con prefijo `node:` (lo exige biome: `useNodejsImportProtocol`).
-- **TypeScript** compilado con `tsup`; `tsc --noEmit` para typecheck.
-- **Biome** formatea y lintea: comillas simples, punto y coma siempre, trailing commas en todo,
-  indent de 2 espacios, ancho de línea 100. No pelees con el formateador: corré `pnpm format`.
-- **Idioma:** comentarios y nombres en **inglés**; docs de cara al usuario (READMEs) en
-  **español rioplatense**. Mantené esa división.
-- **Tests** con vitest. El SDK testea contra un `mock-fetch` con fixtures — **nunca** pegues a
-  la API real en tests.
+- **Pure ESM.** Relative imports carry an explicit `.js` extension (even when the file is `.ts`).
+  Node modules use the `node:` prefix (required by biome: `useNodejsImportProtocol`).
+- **TypeScript** compiled with `tsup`; `tsc --noEmit` for typechecking.
+- **Biome** formats and lints: single quotes, always semicolons, trailing commas everywhere,
+  2-space indent, 100-character line width. Don't fight the formatter: run `pnpm format`.
+- **Language:** comments and names in **English**; user-facing docs (READMEs) in
+  **Rioplatense Spanish**. Keep that split.
+- **Tests** with vitest. The SDK tests against a `mock-fetch` with fixtures — **never** hit the
+  real API in tests.
 
-## Gates antes de commitear
+## Gates before committing
 
-Corré y dejá en verde, en este orden, antes de dar por terminado un cambio:
+Run and leave green, in this order, before considering a change done:
 
 ```bash
-pnpm install      # workspace (habilita builds nativos: keytar, better-sqlite3, esbuild)
-pnpm build        # compila sdk → cli → mcp (el orden importa)
+pnpm install      # workspace (enables native builds: keytar, better-sqlite3, esbuild)
+pnpm build        # compiles sdk → cli → mcp (order matters)
 pnpm typecheck
 pnpm test
-pnpm lint         # o `pnpm format` para autofix
+pnpm lint         # or `pnpm format` for autofix
 ```
 
-pnpm es el gestor recomendado (es un workspace pnpm). No agregues un `package-lock.json` ni un
-`yarn.lock`.
+pnpm is the recommended package manager (this is a pnpm workspace). Do not add a `package-lock.json`
+or a `yarn.lock`.
 
-## Seguridad y datos — innegociable
+## Security and data — non-negotiable
 
-Este proyecto maneja **tokens de auth de usuarios reales** y habla con una **API privada**.
+This project handles **real user auth tokens** and talks to a **private API**.
 
-- **Nunca commitees** credenciales, JWTs, access/refresh tokens, OAuth client secrets ni
-  cookies de sesión. Hay un PII-gate hook que corre Haiku sobre el diff staged; pre-empt antes
-  que dispare.
-- **Nunca loguees tokens** ni los escribas a disco fuera del store previsto. Los tokens de
-  usuario viven en el llavero del SO (keytar) con fallback a archivo `0600`; el MCP hosted los
-  persiste cifrados en SQLite. No los muevas a `.env`, logs ni stdout.
-- **Sin PII real en fixtures, tests, docs ni mensajes de commit.** Usá datos sintéticos:
-  emails `persona@example.test`, nombres `Persona Prueba`, CIs `11111111`. No metas nombres
-  reales atados a identificadores, CIs uruguayas, ni datos de terceros.
-- **Secrets** (deploy, analytics, etc.) se leen en runtime con el wrapper `infisical-secret`,
-  nunca `infisical` pelado ni `.env` commiteado.
-- No expongas más de lo necesario de la huella de la app (headers `app-version`, `user-agent`,
-  base URL viven en `packages/sdk/src/client.ts`): mantenelos ahí, no los esparzas.
+- **Never commit** credentials, JWTs, access/refresh tokens, OAuth client secrets, or session
+  cookies. There is a PII-gate hook that runs Haiku over the staged diff; pre-empt before it fires.
+- **Never log tokens** or write them to disk outside the intended store. User tokens live in the
+  OS keychain (keytar) with a fallback to a `0600` file; the hosted MCP persists them encrypted in
+  SQLite. Do not move them to `.env`, logs, or stdout.
+- **No real PII in fixtures, tests, docs, or commit messages.** Use synthetic data:
+  emails `persona@example.test`, names `Persona Prueba`, IDs `11111111`. Do not include real names
+  tied to identifiers, Uruguayan CIs, or third-party data.
+- **Secrets** (deploy, analytics, etc.) are read at runtime with the `infisical-secret` wrapper —
+  never plain `infisical` or a committed `.env`.
+- Do not expose more of the app's fingerprint than necessary (headers `app-version`, `user-agent`,
+  base URL live in `packages/sdk/src/client.ts`): keep them there, do not scatter them.
 
-## Etiqueta con la API no oficial
+## Etiquette with the unofficial API
 
-- Es ingeniería inversa de una API privada: **no la martilles**. Nada de loops sin control,
-  scraping masivo ni cargas que parezcan abuso. Respetá los Términos del servicio.
-- Si descubrís un endpoint nuevo observando tráfico, modelalo en el SDK con datos sintéticos en
-  los tests; no pegues a producción para "ver qué devuelve" más de lo mínimo necesario.
+- This is reverse-engineered from a private API: **do not hammer it**. No unbounded loops,
+  mass scraping, or loads that look like abuse. Respect the Terms of Service.
+- If you discover a new endpoint by observing traffic, model it in the SDK with synthetic data in
+  the tests; do not hit production just to "see what it returns" beyond the bare minimum.
 
-## Documentación — mantenela sincronizada
+## Documentation — keep it in sync
 
-Cuando cambies tools, comandos o auth, actualizá **en el mismo cambio**:
+When you change tools, commands, or auth, update **in the same change**:
 
-- `README.md` (raíz) — landing del repo.
-- `packages/mcp/README.md` — doc del paquete MCP.
-- La **lista de tools** aparece en ambos READMEs y en `server.ts`: si agregás/quitás una tool,
-  actualizá las tres.
-- **URL canónica del MCP hosted: `https://penca-ovacion.1930.dev/mcp`** (subdominio, no
-  `1930.dev/penca-ovacion/mcp`). La fuente de verdad es `packages/mcp/src/oauth/config.ts`. Si
-  tocás botones de instalación, los base64/deeplinks de Cursor y VS Code codifican esa URL —
-  regeneralos, no los edites a ojo.
+- `README.md` (root) — repo landing page.
+- `packages/mcp/README.md` — MCP package docs.
+- The **tool list** appears in both READMEs and in `server.ts`: if you add/remove a tool,
+  update all three.
+- **Canonical URL of the hosted MCP: `https://penca-ovacion.1930.dev/mcp`** (subdomain, not
+  `1930.dev/penca-ovacion/mcp`). The source of truth is `packages/mcp/src/oauth/config.ts`. If you
+  touch install buttons, the base64/deeplinks for Cursor and VS Code encode that URL —
+  regenerate them, do not edit by hand.
 
-## Publicación
+## Publishing
 
-Solo el MCP se publica en npm (`@1930dev/penca-ovacion-mcp`), vía tag `mcp-v*` → CI. El SDK y
-la CLI todavía no se publican: se usan desde el clon. No publiques a mano.
+Only the MCP is published to npm (`@1930dev/penca-ovacion-mcp`), via tag `mcp-v*` → CI. The SDK and
+CLI are not yet published: they are used from the clone. Do not publish manually.
